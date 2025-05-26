@@ -1,0 +1,91 @@
+<?php
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChildAuth\ChildAuthController;
+use App\Http\Controllers\ChildController;
+use App\Http\Controllers\GrowthRecordsController;
+use App\Http\Controllers\VaccinationController;
+// require __DIR__.'/child.php';
+
+
+
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
+
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user', [AuthController::class, 'me'])->name('api.user');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('api.logout');
+});
+// Route::get('/children/childProfile', [ChildController::class, 'getChildProfile'])->name('api.children.childProfile');
+
+// Children Routes
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/children', [ChildController::class, 'index']);
+    // Route::get('/children/{id}', [ChildController::class, 'show'])->name('api.children.show');
+    Route::post('/children', [ChildController::class, 'store']);
+    Route::put('/children/{id}', [ChildController::class, 'update']);
+    Route::get('/children/childProfile', [ChildController::class, 'getChildProfile']);
+    Route::get('/children/parentProfile', [ChildController::class, 'getParentProfile']);
+    Route::get('/children/search', [ChildController::class, 'search']);
+
+});
+
+//Growth Records Routes
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/growth-records', [GrowthRecordsController::class, 'index'])->name('api.growth-records.index');
+    Route::get('/growth-records/{id}', [GrowthRecordsController::class, 'show'])->name('api.growth-records.show');
+    Route::post('/growth-records', [GrowthRecordsController::class, 'store'])->name('api.growth-records.store');
+    Route::put('/growth-records/{id}', [GrowthRecordsController::class, 'update'])->name('api.growth-records.update');
+    Route::delete('/growth-records/{id}', [GrowthRecordsController::class, 'destroy'])->name('api.growth-records.destroy');
+    Route::post('/growth-records/growth-chart', [GrowthRecordsController::class, 'getGrowthChart'])->name('api.growth-records.growth-chart');
+});
+
+// Healthcare Providers Routes with role-based access control
+Route::middleware(['auth:sanctum', 'role:healthcare'])->group(function(){
+
+});
+
+
+Route::prefix('vaccinations')->group(function () {
+    // Get vaccinations (requires child_id in request)
+    Route::get('/', [VaccinationController::class, 'index']);
+    
+    // Create vaccination record
+    Route::post('/', [VaccinationController::class, 'store']);
+    
+    // Get status report
+    Route::get('/status-report', [VaccinationController::class, 'statusReport']);
+    
+    // Check vaccination_no availability
+    Route::get('/check-availability', [VaccinationController::class, 'checkAvailability']);
+    
+    // Update vaccination
+    Route::put('/update', [VaccinationController::class, 'update']);
+    
+    // Delete vaccination
+    Route::delete('/delete', [VaccinationController::class, 'destroy']);
+});
+
+
+//Children Routes
+
+Route::post('/childLogin', [ChildAuthController::class, 'login']);
+
+Route::middleware(['auth:sanctum', 'role:child'])->prefix('children')->group(function () {
+    Route::get('/childProfile', [ChildController::class, 'getChildProfile']);
+    Route::get('/parentProfile', [ChildController::class, 'getParentProfile']);
+    Route::get('/vaccination', [VaccinationController::class, 'showParent']);
+    Route::get('/growthChart', [GrowthRecordsController::class, 'getGrowthChartByToken']);
+    Route::get('/growthSummary', [ChildController::class, 'growthRecordSummary']);
+    Route::post('/changePassword', [ChildAuthController::class, 'changePassword']);
+    Route::post('/logout', [ChildAuthController::class, 'logout']);
+});
+
+//Admin Routes
+Route::post('/adminLogin', [AuthController::class, 'adminLogin']);
