@@ -29,8 +29,8 @@ class ChildAuthController extends Controller
                 ]);
             }
 
-            // Check if the user is a child
-            if ($user->role !== 'child') {
+            // Check if the user is a child (using Spatie's hasRole method)
+            if (! $user->hasRole('child')) {
                 return response()->json([
                     'message' => 'Unauthorized',
                 ], 403);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\HealthCareProvider;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class HealthCareProviderController extends Controller
 {
@@ -28,6 +29,7 @@ class HealthCareProviderController extends Controller
      */
     public function store(Request $request)
     {
+        DB::beginTransaction();
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
@@ -38,22 +40,36 @@ class HealthCareProviderController extends Controller
                 'gender' => 'required|string|max:10',
                 'status' => 'required|boolean',
             ]);
-            
-            $healthCareProvider = HealthCareProvider::create($validated);
-            // Optionally, you can attach the user role if needed
+
+            // Only allow nurse or doctor as userRole
+            if (!in_array(strtolower($validated['userRole']), ['nurse', 'doctor'])) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Invalid userRole. Only nurse or doctor are allowed.'
+                ], 422);
+            }
 
             $plainPassword = $validated['facility'] . '@' . $validated['license'];
-            
-            $user = $healthCareProvider->user()->create([
+
+            // Create the user first
+            $user = \App\Models\User::create([
                 'name' => $validated['name'],
-                'license' => $validated['license'],
+                'username' => $validated['license'],
                 'password' => bcrypt($plainPassword),
-                'role' => $validated['userRole'],
             ]);
+            // Assign the role to the user
+            $user->assignRole($validated['userRole']);
+
+            // Add user_id to the validated data
+            $validated['user_id'] = $user->id;
+
+            // Now create the HealthCareProvider
+            $healthCareProvider = HealthCareProvider::create($validated);
 
             $token = $user->createToken('auth_token')->plainTextToken;
-            $healthCareProvider->user_id = $user->id;
-            $healthCareProvider->save();
+
+            DB::commit();
 
             return response()->json([
                 'status' => 'success',
@@ -67,6 +83,7 @@ class HealthCareProviderController extends Controller
                 'token_type' => 'Bearer',
             ], 201);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to create Health Care Provider',
@@ -80,7 +97,29 @@ class HealthCareProviderController extends Controller
      */
     public function show(HealthCareProvider $healthCareProvider)
     {
-        //
+        // Authenticate using the token (handled by middleware, e.g., sanctum:auth)
+        // Load related user and children if needed
+        $healthCareProvider->load(['user', 'children', 'growthRecords', 'vaccinations']);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'id' => $healthCareProvider->id,
+                'name' => $healthCareProvider->name,
+                'license' => $healthCareProvider->license,
+                'userRole' => $healthCareProvider->userRole,
+                'facility' => $healthCareProvider->facility,
+                'contact' => $healthCareProvider->contact,
+                'gender' => $healthCareProvider->gender,
+                'status' => $healthCareProvider->status,
+                'user' => $healthCareProvider->user,
+                'children' => $healthCareProvider->children,
+                'growth_records' => $healthCareProvider->growthRecords,
+                'vaccinations' => $healthCareProvider->vaccinations,
+                'created_at' => $healthCareProvider->created_at,
+                'updated_at' => $healthCareProvider->updated_at,
+            ]
+        ], 200);
     }
 
     /**
@@ -105,5 +144,43 @@ class HealthCareProviderController extends Controller
     public function destroy(HealthCareProvider $healthCareProvider)
     {
         //
+    }
+
+    /**
+     * Show the authenticated healthcare provider's details using the auth token.
+     */
+    public function showAuthenticated(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthenticated'], 401);
+        }
+        // Find the healthcare provider by user_id
+        $healthCareProvider = HealthCareProvider::where('user_id', $user->id)
+            ->with(['user', 'children', 'growthRecords'])
+            ->first();
+        if (!$healthCareProvider) {
+            return response()->json(['status' => 'error', 'message' => 'Healthcare provider not found'], 404);
+        }
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'id' => $healthCareProvider->id,
+                'name' => $healthCareProvider->name,
+                'license' => $healthCareProvider->license,
+                'userRole' => $healthCareProvider->userRole,
+                'facility' => $healthCareProvider->facility,
+                'contact' => $healthCareProvider->contact,
+                'gender' => $healthCareProvider->gender,
+                'status' => $healthCareProvider->status,
+                'user' => $healthCareProvider->user,
+                'children' => $healthCareProvider->children,
+                'children_count' => $healthCareProvider->children->count(),
+                'growth_records' => $healthCareProvider->growthRecords,
+                // 'vaccinations' => $healthCareProvider->vaccinations,
+                'created_at' => $healthCareProvider->created_at,
+                'updated_at' => $healthCareProvider->updated_at,
+            ]
+        ], 200);
     }
 }

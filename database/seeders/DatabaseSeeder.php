@@ -23,6 +23,10 @@ class DatabaseSeeder extends Seeder
 
         $this->call(RoleSeeder::class);
         $this->call(AdminSeeder::class);
+        $this->call(HealthCareProviderSeeder::class);
+        $this->call(ChildSeeder::class);
+        $this->call(GrowthRecordsSeeder::class);
         $this->call(VaccinationSeeder::class);
+        $this->call(UserSeeder::class);
     }
 }

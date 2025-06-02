@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class GrowthRecords extends Model
 {
+    use HasFactory;
+
     // protected $table = 'growth_records';
 
     protected $fillable = [
@@ -19,7 +22,9 @@ class GrowthRecords extends Model
     {
         return $this->belongsTo(Child::class, 'child_id');
     }
-    public function HealthCareProvider()
+
+
+    public function healthCareProvider()
     {
         return $this->belongsTo(HealthCareProvider::class, 'health_care_provider_id');
     }

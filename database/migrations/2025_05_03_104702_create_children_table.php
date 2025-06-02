@@ -18,6 +18,7 @@ return new class extends Migration
             $table->date('date_of_birth');
             $table->string('gender');
             $table->decimal('birthWeight', 5, 2)->nullable();
+            $table->decimal('birthHeight', 5, 2)->nullable();
             $table->string('fatherName')->nullable();
             $table->string('motherName')->nullable();
             $table->string('birthFacility')->nullable();
@@ -26,8 +27,8 @@ return new class extends Migration
             $table->string('phoneNo')->nullable();
             $table->json('address')->nullable();
             $table->integer('motherAge')->nullable();
-            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
-            $table->foreignId('health_care_provider_id')->nullable()->constrained('health_care_providers');
+            $table->unsignedBigInteger('user_id')->unique()->nullable(false);
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->timestamps();
         });
     }

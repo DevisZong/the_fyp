@@ -11,17 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('vaccinations', function (Blueprint $table) {
+        Schema::create('vaccination_reminders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('child_id')->constrained()->onDelete('cascade');
-            // $table->foreignId('health_care_provider_id')->references('id')->on('health_care_providers');
-            $table->string('vaccination_code');
-            $table->string('vaccination_no')->nullable();
-            $table->boolean('status')->default(false);
+            $table->integer('vaccine_age');
+            $table->timestamp('sent_at');
             $table->timestamps();
-            
-            $table->index('vaccination_code');
-            $table->index('child_id');
         });
     }
 
@@ -30,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('vaccinations');
+        Schema::dropIfExists('vaccination_reminders');
     }
 };

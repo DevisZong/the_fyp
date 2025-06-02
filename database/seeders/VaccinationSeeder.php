@@ -33,7 +33,7 @@ class VaccinationSeeder extends Seeder
      * Run the database seeds.
      */
     // database/seeders/VaccinationSeeder.php
- public function run()
+    public function run()
     {
         // Create vaccination records for existing children
         Child::each(function ($child) {
@@ -41,7 +41,7 @@ class VaccinationSeeder extends Seeder
         });
     }
 
-        public static function getVaccinationCodes()
+    public static function getVaccinationCodes()
     {
         return (new self)->vaccinationCodes;
     }

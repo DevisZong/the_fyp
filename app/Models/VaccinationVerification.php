@@ -1,30 +1,30 @@
 <?php
+// app/Models/VaccinationVerification.php
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Vaccination extends Model
+class VaccinationVerification extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'child_id',
+        'health_care_provider_id',
         'vaccination_code',
         'vaccination_no',
-        'status',
-        'health_care_provider_id'
+        'verification_code',
+        'expires_at',
     ];
 
-    protected $casts = ['status' => 'boolean'];
+    protected $dates = ['expires_at'];
 
     public function child()
     {
         return $this->belongsTo(Child::class);
     }
+
     public function healthCareProvider()
     {
-        return $this->belongsTo(HealthCareProvider::class, 'health_care_provider_id');
+        return $this->belongsTo(HealthCareProvider::class);
     }
 }

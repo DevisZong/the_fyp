@@ -59,16 +59,16 @@ class ChildController extends Controller
     {
         try {
             $user = $request->user();
-            
+
             // Get the child based on the authenticated user
-            $child = Child::where('user_id', $user->id)->with('growthRecords')->first();      
-       
+            $child = Child::where('user_id', $user->id)->with('growthRecords')->first();
+
             if (!$child) {
                 return response()->json([
                     'error' => 'Child not found',
                 ], 404);
             } else {
-                $latestGrowthRecord = $child->latestGrowthRecord();
+                $latestGrowthRecord = $child->latestGrowthRecord;
                 $nextCheckup = $this->calculateNextCheckup($child->dateOfBirth);
                 return response()->json([
                     'child' => [
@@ -97,10 +97,10 @@ class ChildController extends Controller
     {
         try {
             $user = $request->user();
-            
+
             // Get the child based on the authenticated user
             $child = Child::where('user_id', $user->id)->first();
-            
+
             if (!$child) {
                 return response()->json([
                     'error' => 'Child not found',
@@ -110,7 +110,7 @@ class ChildController extends Controller
                     'growthRecordSummary' => [
                         'birthWeight' => $child->birthWeight,
                         'birthHeight' => $child->birthHeight,
-                        'birthDate' => $child->dateOfBirth,
+                        'birthDate' => $child->date_of_birth, // fixed: use correct attribute
                         'weight' => $child->latestGrowthRecord ? $child->latestGrowthRecord->weight : null,
                         'height' => $child->latestGrowthRecord ? $child->latestGrowthRecord->height : null,
                         'nextCheckup' => $this->calculateNextCheckup($child->dateOfBirth),
@@ -130,10 +130,10 @@ class ChildController extends Controller
     {
         try {
             $user = $request->user();
-            
+
             // Get the child based on the authenticated user
             $child = Child::where('user_id', $user->id)->first();
-            
+
             if (!$child) {
                 return response()->json([
                     'error' => 'Child not found',
@@ -144,13 +144,14 @@ class ChildController extends Controller
                         'fatherName' => $child->fatherName,
                         'motherName' => $child->motherName,
                         'birthFacility' => $child->birthFacility,
+                        'birthAttendant' => $child->birthAttendant, // Add this line
                         'email' => $child->email,
                         'phoneNo' => $child->phoneNo,
                         'motherAge' => $child->motherAge,
                         'address' => [
-                            'street' => $child->address['street'],
-                            'ward' => $child->address['ward'],
-                            'Region' => $child->address['Region'],
+                            'street' => $child->address['street'] ?? null,
+                            'ward' => $child->address['ward'] ?? null,
+                            'Region' => $child->address['Region'] ?? null,
                         ]
                     ],
                 ]);
@@ -168,30 +169,29 @@ class ChildController extends Controller
     {
         try {
             $query = Child::query();
-            
+
             if ($request->has('q')) {
                 $searchTerm = $request->input('q');
-                
-                $query->where(function($q) use ($searchTerm) {
-                    $q->where('childName', 'like', '%'.$searchTerm.'%')
-                    ->orWhere('childNo', 'like', '%'.$searchTerm.'%')
-                    ->orWhere('fatherName', 'like', '%'.$searchTerm.'%')
-                    ->orWhere('motherName', 'like', '%'.$searchTerm.'%');
+
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('childName', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('childNo', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('fatherName', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('motherName', 'like', '%' . $searchTerm . '%');
                 });
             }
-            
+
             // Add any filters you need
             if ($request->has('gender')) {
                 $query->where('gender', $request->input('gender'));
             }
-            
+
             $results = $query->limit(10)->get();
-            
+
             return response()->json([
                 'status' => 'success',
                 'data' => $results
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -221,6 +221,7 @@ class ChildController extends Controller
                 'date_of_birth' => 'required|date',
                 'gender' => 'required|string|max:10',
                 'birthWeight' => 'required|numeric',
+                'birthHeight' => 'required|numeric',
                 'fatherName' => 'required|string|max:255',
                 'motherName' => 'required|string|max:255',
                 'birthFacility' => 'required|string|max:255',
@@ -235,26 +236,29 @@ class ChildController extends Controller
                 'health_care_provider_id' => 'required|exists:health_care_providers,id'
             ]);
 
-            // DB::beginTransaction();
-
-            $child = Child::create($validated);
-
+            // Create the user first
             $user = User::create([
                 'name' => $validated['childName'],
                 'childNo' => $validated['childNo'],
                 'username' => $validated['childNo'],
-                'password' => Hash::make($validated['fatherName']), // You can change this to a more secure password
+                'password' => Hash::make($validated['fatherName'])
             ]);
-            
-            // Assign 'child' role to the user
             $user->assignRole('child');
-            
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            $child->user_id = $user->id;
-            $child->save();
-            
-            // DB::commit();
+            // Add user_id to the validated data for the child
+            $childData = $validated;
+            $childData['user_id'] = $user->id;
+            unset($childData['health_care_provider_id']); // Remove pivot id from child data
+
+            $child = Child::create($childData);
+
+            // Attach the child to the health care provider via the pivot table
+            $child->healthCareProviders()->attach($validated['health_care_provider_id']);
+
+            // Send SMS to parent with credentials and vaccination info
+            $this->sendWelcomeSms($child, $validated['phoneNo'], $validated['childNo'], $validated['fatherName']);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Child created successfully',
@@ -267,7 +271,6 @@ class ChildController extends Controller
                 'token_type' => 'Bearer',
             ], 201);
         } catch (\Exception $e) {
-            // DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error creating child',
@@ -297,9 +300,46 @@ class ChildController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Child $child)
+    public function update(Request $request)
     {
-        //
+        try {
+            $validated = $request->validate([
+                'id' => 'required|exists:children,id',
+                'childName' => 'sometimes|string|max:255',
+                'date_of_birth' => 'sometimes|date',
+                'gender' => 'sometimes|string|max:10',
+                'birthWeight' => 'sometimes|numeric',
+                'fatherName' => 'sometimes|string|max:255',
+                'motherName' => 'sometimes|string|max:255',
+                'birthFacility' => 'sometimes|string|max:255',
+                'birthAttendant' => 'sometimes|string|max:255',
+                'email' => 'sometimes|email|max:255',
+                'phoneNo' => 'sometimes|string|max:20',
+                'address' => 'sometimes|array',
+                'address.street' => 'sometimes|string|max:255',
+                'address.ward' => 'sometimes|string|max:255',
+                'address.Region' => 'sometimes|string|max:255',
+                'motherAge' => 'sometimes|integer|min:0|max:120',
+            ]);
+
+            $child = Child::findOrFail($validated['id']);
+            $child->fill($validated);
+            $child->save();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Child updated successfully',
+                'child' => $child
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error updating child',
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 400);
+        }
     }
 
     /**
@@ -308,5 +348,22 @@ class ChildController extends Controller
     public function destroy(Child $child)
     {
         //
+    }
+
+    /**
+     * Send welcome SMS to parent with credentials and vaccination info
+     */
+    private function sendWelcomeSms($child, $phoneNo, $username, $password)
+    {
+        try {
+            $smsService = new \App\Services\SmsService();
+            $childName = $child->childName;
+            $message = "Mzazi wa $childName, hongera kwa kupata mtoto! Akaunti yako imeundwa. Tumia namba ya mtumiaji: $username na neno la siri: $password kuingia. Baada ya kuzaliwa, mtoto atatakiwa kupokea chanjo zifuatazo baada ya kuzaliwa: BCF, bOPVO.";
+            if ($phoneNo) {
+                $smsService->send($phoneNo, $message);
+            }
+        } catch (\Exception $e) {
+            // Optionally log error
+        }
     }
 }
