@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
         Child::all()->each(function ($child) {
             if (!$child->user_id) {
                 $user = User::factory()->create([
-                    'name' => $child->childName . "'s Parent",
+                    'name' => $child->childName,
                     'username' => $child->childNo,
                     // Password same as ChildController@store: father's name
                     'password' => bcrypt($child->fatherName),

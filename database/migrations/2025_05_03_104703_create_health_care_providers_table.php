@@ -17,8 +17,9 @@ return new class extends Migration
             $table->string('license')->unique();
             $table->string('userRole');
             $table->string('facility');
-            $table->string('contact'); 
+            $table->string('contact');
             $table->string('gender');
+            $table->string('picture')->nullable();
             $table->boolean('status')->default(true);
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();

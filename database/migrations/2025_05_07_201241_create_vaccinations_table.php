@@ -14,12 +14,13 @@ return new class extends Migration
         Schema::create('vaccinations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('child_id')->constrained()->onDelete('cascade');
-            // $table->foreignId('health_care_provider_id')->references('id')->on('health_care_providers');
+            $table->unsignedBigInteger('health_care_provider_id')->nullable();
+            $table->foreign('health_care_provider_id')->references('id')->on('health_care_providers')->onDelete('set null');
             $table->string('vaccination_code');
             $table->string('vaccination_no')->nullable();
             $table->boolean('status')->default(false);
             $table->timestamps();
-            
+
             $table->index('vaccination_code');
             $table->index('child_id');
         });

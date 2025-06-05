@@ -19,7 +19,7 @@ class GrowthRecordsController extends Controller
                 'message' => 'Growth Data fetched Successfully',
                 'data' => GrowthRecords::with('healthCareProvider')->get(),
             ]);
-        }catch(\Exception $e){
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error fetching growth data',
                 'message' => 'Failed to fetch growth data',
@@ -47,7 +47,7 @@ class GrowthRecordsController extends Controller
             ]);
 
             $child_id = $validated['child_id'];
-        
+
             $growthRecords = GrowthRecords::where('child_id', $child_id)
                 ->with('healthCareProvider')
                 ->get()
@@ -93,7 +93,7 @@ class GrowthRecordsController extends Controller
             $user = $request->user();
 
             // Ensure the user is authenticated and has the 'child' role
-            if (!$user->hasRole('child') ) {
+            if (!$user->hasRole('child')) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized or not a child user.',
@@ -147,20 +147,86 @@ class GrowthRecordsController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Get the growth chart for a child by child ID (from route parameter).
+     *
+     * @param int $childId
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function getGrowthChartByChildId($childId)
     {
-        try{
+        try {
+            // Validate that the child exists
+            $childExists = Child::where('id', $childId)->exists();
+            if (!$childExists) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Child not found.',
+                ], 404);
+            }
+
+            $growthRecords = GrowthRecords::where('child_id', $childId)
+                ->with('healthCareProvider')
+                ->get()
+                ->groupBy(function ($record) {
+                    return \Carbon\Carbon::parse($record->created_at)->format('Y-m'); // Group by month (YYYY-MM)
+                })
+                ->map(function ($records, $month) {
+                    return [
+                        'month' => $month,
+                        'weights' => $records->pluck('weight'),
+                        'health_care_providers' => $records->pluck('healthCareProvider')->unique('id')->values(),
+                    ];
+                })
+                ->values();
+
+            if ($growthRecords->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No growth records found for the specified child.',
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Growth chart fetched successfully.',
+                'data' => $growthRecords,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error fetching growth chart.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     * 
+     * @param Request $request
+     * @param int $childId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function store(Request $request, $childId)
+    {
+        try {
+            // First validate that the child exists
+            $childExists = Child::where('id', $childId)->exists();
+            if (!$childExists) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Child not found.',
+                ], 404);
+            }
+
             $validated = $request->validate([
-                'child_id' => 'required|string|max:255',
                 'health_care_provider_id' => 'required|exists:health_care_providers,id',
                 'weight' => 'required|numeric',
                 'height' => 'required|numeric',
             ]);
 
             // Restrict to one record per child per month
-            $existing = GrowthRecords::where('child_id', $validated['child_id'])
+            $existing = GrowthRecords::where('child_id', $childId)
                 ->whereYear('created_at', now()->year)
                 ->whereMonth('created_at', now()->month)
                 ->exists();
@@ -172,7 +238,7 @@ class GrowthRecordsController extends Controller
             }
 
             $growthRecord = GrowthRecords::create([
-                'child_id' => $validated['child_id'],
+                'child_id' => $childId,
                 'health_care_provider_id' => $validated['health_care_provider_id'],
                 'weight' => $validated['weight'],
                 'height' => $validated['height'],
@@ -183,7 +249,7 @@ class GrowthRecordsController extends Controller
                 'message' => 'Data stored successfully',
                 'data' => $growthRecord
             ]);
-        }catch(\Exception $e){
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error storing data',
@@ -222,5 +288,48 @@ class GrowthRecordsController extends Controller
     public function destroy(GrowthRecords $growthRecords)
     {
         //
+    }
+
+    /**
+     * Get specific growth record details for a child.
+     *
+     * @param int $childId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getGrowthRecordDetails($childId)
+    {
+        try {
+            $growthRecords = GrowthRecords::where('child_id', $childId)
+                ->select('child_id', 'height', 'weight', 'created_at')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($record) {
+                    return [
+                        'child_no' => $record->child_id,
+                        'height' => $record->height,
+                        'weight' => $record->weight,
+                        'date' => $record->created_at->format('Y-m-d')
+                    ];
+                });
+
+            if ($growthRecords->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No growth records found for the specified child.',
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Growth record details fetched successfully.',
+                'data' => $growthRecords
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error fetching growth record details.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

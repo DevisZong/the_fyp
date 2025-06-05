@@ -14,10 +14,10 @@ class ChildSeeder extends Seeder
     public function run()
     {
         // Generate 10 children with correct user linkage and credentials
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 20; $i++) {
             $childData = \Database\Factories\ChildFactory::new()->make()->toArray();
             $user = User::factory()->create([
-                'name' => $childData['childName'] . "'s Parent",
+                'name' => $childData['childName'],
                 'username' => $childData['childNo'],
                 'password' => bcrypt($childData['fatherName']),
                 'remember_token' => Str::random(10),
@@ -26,7 +26,6 @@ class ChildSeeder extends Seeder
             unset($childData['date_of_birth_formatted']);
             $childData['user_id'] = $user->id;
             $child = Child::create($childData);
-            GrowthRecords::factory()->count(3)->create(['child_id' => $child->id]);
             foreach (\Database\Seeders\VaccinationSeeder::getVaccinationCodes() as $code) {
                 Vaccination::factory()->create([
                     'child_id' => $child->id,

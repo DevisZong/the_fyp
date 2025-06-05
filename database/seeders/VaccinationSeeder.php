@@ -54,7 +54,8 @@ class VaccinationSeeder extends Seeder
                 'vaccination_code' => $code
             ], [
                 'vaccination_no' => null,
-                'status' => false
+                'status' => false,
+                'health_care_provider_id' => null
             ]);
         }
     }

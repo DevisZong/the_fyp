@@ -239,7 +239,6 @@ class ChildController extends Controller
             // Create the user first
             $user = User::create([
                 'name' => $validated['childName'],
-                'childNo' => $validated['childNo'],
                 'username' => $validated['childNo'],
                 'password' => Hash::make($validated['fatherName'])
             ]);
@@ -263,12 +262,12 @@ class ChildController extends Controller
                 'status' => 'success',
                 'message' => 'Child created successfully',
                 'child' => $child,
-                'login_credentials' => [
+                'credentials_info' => [
                     'username' => $validated['childNo'],
-                    'password' => $validated['fatherName'],
+                    'note' => 'Please use your child number as username and father\'s name as password to login.'
                 ],
                 'access_token' => $token,
-                'token_type' => 'Bearer',
+                'token_type' => 'Bearer'
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
@@ -286,7 +285,39 @@ class ChildController extends Controller
      */
     public function show(Child $child)
     {
-        //
+        try {
+            // Use the model binding to automatically fetch the child
+            // Format the address data
+            $formattedChild = [
+                'id' => $child->id,
+                'childNo' => $child->childNo,
+                'childName' => $child->childName,
+                'gender' => $child->gender,
+                'date_of_birth' => $child->date_of_birth,
+                'date_of_birth_formatted' => \Carbon\Carbon::parse($child->date_of_birth)->format('Y-m-d'),
+                'fatherName' => $child->fatherName,
+                'motherName' => $child->motherName,
+                'address' => $child->address,
+                'birthWeight' => $child->birthWeight,
+                'birthHeight' => $child->birthHeight,
+                'birthFacility' => $child->birthFacility,
+                'birthAttendant' => $child->birthAttendant,
+                'email' => $child->email,
+                'phoneNo' => $child->phoneNo,
+                'motherAge' => $child->motherAge
+            ];
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $formattedChild
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error fetching child details',
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 
     /**
@@ -358,7 +389,7 @@ class ChildController extends Controller
         try {
             $smsService = new \App\Services\SmsService();
             $childName = $child->childName;
-            $message = "Mzazi wa $childName, hongera kwa kupata mtoto! Akaunti yako imeundwa. Tumia namba ya mtumiaji: $username na neno la siri: $password kuingia. Baada ya kuzaliwa, mtoto atatakiwa kupokea chanjo zifuatazo baada ya kuzaliwa: BCF, bOPVO.";
+            $message = "Mzazi wa $childName, hongera! Akaunti yako imeundwa. Tumia namba ya mtoto ($username) kama jina la mtumiaji na jina la baba ($password) kama neno la siri kuingia. Baada ya kuzaliwa, mtoto atatakiwa kupokea chanjo zifuatazo: BCF, bOPVO.";
             if ($phoneNo) {
                 $smsService->send($phoneNo, $message);
             }

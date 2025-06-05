@@ -16,6 +16,7 @@ class HealthCareProvider extends Model
         'facility',
         'contact',
         'gender',
+        'picture',
         'status',
         'user_id',
     ];

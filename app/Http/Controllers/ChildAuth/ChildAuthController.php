@@ -71,7 +71,7 @@ class ChildAuthController extends Controller
             report($e);
             return response()->json(['message' => 'Error during logout. Please try again.'], 500);
         }
-    }
+    } 
 
     public function changePassword(Request $request)
     {

@@ -58,18 +58,24 @@ class VitaminAndDewormingController extends Controller
      */
 
     /**
-     * this method is for healthcare providers to view the vitamin and deworming records of a child
+     * this method is for viewing the vitamin and deworming records of the authenticated child
      */
     public function show(Request $request)
     {
         try {
-            $validated = $request->validate([
-                'child_id' => 'required|exists:children,id'
-            ]);
+            $user = $request->user();
+
+            // Find the child record associated with the authenticated user
+            $child = Child::where('user_id', $user->id)->first();
+            if (!$child) {
+                return response()->json([
+                    'message' => 'Child not found'
+                ], 404);
+            }
 
             // Query the VitaminAndDeworming table for all records matching the child_id
-            $records = VitaminAndDeworming::where('child_id', $validated['child_id'])
-            ->get(['created_at', 'Vitamin_A', 'Deworming', 'status']);
+            $records = VitaminAndDeworming::where('child_id', $child->id)
+                ->get(['created_at', 'Vitamin_A', 'Deworming', 'status']);
 
             // Return the records in the response
             return response()->json([

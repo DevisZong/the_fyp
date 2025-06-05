@@ -8,6 +8,7 @@ use App\Http\Controllers\ChildController;
 use App\Http\Controllers\GrowthRecordsController;
 use App\Http\Controllers\VaccinationController;
 use App\Http\Controllers\HealthCareProviderController;
+use App\Http\Controllers\VitaminAndDewormingController;
 use PHPUnit\TextUI\Help;
 use Spatie\Permission\Contracts\Role;
 
@@ -37,13 +38,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/children/childProfile', [ChildController::class, 'getChildProfile']);
     Route::get('/children/parentProfile', [ChildController::class, 'getParentProfile']);
     Route::get('/children/search', [ChildController::class, 'search']);
+    // Route for fetching child details by ID
+
 });
 
 //Growth Records Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/growth-records', [GrowthRecordsController::class, 'index'])->name('api.growth-records.index');
     Route::get('/growth-records/{id}', [GrowthRecordsController::class, 'show'])->name('api.growth-records.show');
-    Route::post('/growth-records', [GrowthRecordsController::class, 'store'])->name('api.growth-records.store');
+    Route::post('/growth-records/{childId}', [GrowthRecordsController::class, 'store'])->name('api.growth-records.store');
     Route::put('/growth-records/{id}', [GrowthRecordsController::class, 'update'])->name('api.growth-records.update');
     Route::delete('/growth-records/{id}', [GrowthRecordsController::class, 'destroy'])->name('api.growth-records.destroy');
     Route::post('/growth-records/growth-chart', [GrowthRecordsController::class, 'getGrowthChart'])->name('api.growth-records.growth-chart');
@@ -79,6 +82,7 @@ Route::middleware(['auth:sanctum', 'role:child'])->prefix('children')->group(fun
     Route::get('/childProfile', [ChildController::class, 'getChildProfile']);
     Route::get('/parentProfile', [ChildController::class, 'getParentProfile']);
     Route::get('/vaccination', [VaccinationController::class, 'showParent']);
+    Route::get('/vitaminAndDeworming', [VitaminAndDewormingController::class, 'show']);
     Route::get('/growthChart', [GrowthRecordsController::class, 'getGrowthChartByToken']);
     Route::get('/growthSummary', [ChildController::class, 'growthRecordSummary']);
     Route::post('/changePassword', [ChildAuthController::class, 'changePassword']);
@@ -100,11 +104,17 @@ Route::post('/healthcare-login', [AuthController::class, 'healthcareLogin'])->mi
 Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->group(function () {
     Route::get('/healthcare-profile', [HealthCareProviderController::class, 'showAuthenticated']);
     Route::get('/children', [ChildController::class, 'index']);
-    Route::post('/growth-records', [GrowthRecordsController::class, 'store']);
     Route::post('/children', [ChildController::class, 'store']);
+    //child-details file 
+    Route::get('/children/{child}', [ChildController::class, 'show']);
+    Route::post('/growth-records/{childId}', [GrowthRecordsController::class, 'store']);
+    Route::get('/growth-details/{childId}', [GrowthRecordsController::class, 'getGrowthRecordDetails']);
+    Route::get('/chart-data/{childId}', [GrowthRecordsController::class, 'getGrowthChartByChildId']);
     Route::post('/vaccinations/store-with-verification', [VaccinationController::class, 'storeWithVerification']);
     Route::post('/vaccinations/verify-and-store', [VaccinationController::class, 'verifyAndStoreVaccination']);
-
+    //end
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
+    Route::post('/logout', [AuthController::class, 'logout']);
 });
 
 
