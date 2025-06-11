@@ -261,7 +261,7 @@ class ChildController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Child created successfully',
-                'child' => $child,
+                // 'child' => $child,
                 'credentials_info' => [
                     'username' => $validated['childNo'],
                     'note' => 'Please use your child number as username and father\'s name as password to login.'
