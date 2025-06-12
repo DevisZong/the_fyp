@@ -17,9 +17,9 @@ class VaccinationFactory extends Factory
         return [
             'child_id' => Child::factory(),
             'vaccination_code' => $this->faker->unique()->lexify('VAC???'),
-            'vaccination_no' => $status ? $this->faker->numerify('VACNO###') : null,
-            'status' => $status,
-            'health_care_provider_id' => $status ? HealthCareProvider::inRandomOrder()->first()?->id : null,
+            'vaccination_no' => null,
+            'Hali' => 'inasubiri',
+            'health_care_provider_id' => null,
         ];
     }
 }

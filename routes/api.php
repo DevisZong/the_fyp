@@ -9,6 +9,8 @@ use App\Http\Controllers\GrowthRecordsController;
 use App\Http\Controllers\VaccinationController;
 use App\Http\Controllers\HealthCareProviderController;
 use App\Http\Controllers\VitaminAndDewormingController;
+use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\FoodFactController;
 use PHPUnit\TextUI\Help;
 use Spatie\Permission\Contracts\Role;
 
@@ -48,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/growth-records/{id}', [GrowthRecordsController::class, 'show'])->name('api.growth-records.show');
     Route::post('/growth-records/{childId}', [GrowthRecordsController::class, 'store'])->name('api.growth-records.store');
     Route::put('/growth-records/{id}', [GrowthRecordsController::class, 'update'])->name('api.growth-records.update');
+    Route::put('/growth-records/update/{childId}', [GrowthRecordsController::class, 'update'])->name('api.growth-records.update-by-childId');
     Route::delete('/growth-records/{id}', [GrowthRecordsController::class, 'destroy'])->name('api.growth-records.destroy');
     Route::post('/growth-records/growth-chart', [GrowthRecordsController::class, 'getGrowthChart'])->name('api.growth-records.growth-chart');
 });
@@ -81,6 +84,7 @@ Route::post('/childLogin', [ChildAuthController::class, 'login']);
 Route::middleware(['auth:sanctum', 'role:child'])->prefix('children')->group(function () {
     Route::get('/childProfile', [ChildController::class, 'getChildProfile']);
     Route::get('/parentProfile', [ChildController::class, 'getParentProfile']);
+    Route::get('/appointments', [AppointmentController::class, 'getAppointments']);
     Route::get('/vaccination', [VaccinationController::class, 'showParent']);
     Route::get('/vitaminAndDeworming', [VitaminAndDewormingController::class, 'show']);
     Route::get('/growthChart', [GrowthRecordsController::class, 'getGrowthChartByToken']);
@@ -90,7 +94,7 @@ Route::middleware(['auth:sanctum', 'role:child'])->prefix('children')->group(fun
 });
 
 //Admin Routes
-Route::post('/adminLogin', [AuthController::class, 'adminLogin'])->middleware('throttle:5,1');
+Route::post('/adminLogin', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/children', [ChildController::class, 'index']);
@@ -109,9 +113,12 @@ Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->
     Route::get('/children/{child}', [ChildController::class, 'show']);
     Route::post('/growth-records/{childId}', [GrowthRecordsController::class, 'store']);
     Route::get('/growth-details/{childId}', [GrowthRecordsController::class, 'getGrowthRecordDetails']);
+    Route::put('/growth-records/update/{childId}', [GrowthRecordsController::class, 'update']);
     Route::get('/chart-data/{childId}', [GrowthRecordsController::class, 'getGrowthChartByChildId']);
     Route::post('/vaccinations/store-with-verification', [VaccinationController::class, 'storeWithVerification']);
     Route::post('/vaccinations/verify-and-store', [VaccinationController::class, 'verifyAndStoreVaccination']);
+    Route::get('/vitamin-deworming/{childId}', [VitaminAndDewormingController::class, 'showByChildId']);
+    Route::post('/vitamin-deworming/{childId}', [VitaminAndDewormingController::class, 'store']);
     //end
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -121,3 +128,11 @@ Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->
 
 // Activity Logs Route
 Route::middleware(['auth:sanctum', 'role:admin'])->get('/activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index']);
+
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/appointments', [AppointmentController::class, 'getAppointments']);
+    Route::post('/appointments/send-notifications', [AppointmentController::class, 'sendNotifications']);
+    Route::get('/foodfact/current-month', [FoodFactController::class, 'currentMonthDiet']);
+});

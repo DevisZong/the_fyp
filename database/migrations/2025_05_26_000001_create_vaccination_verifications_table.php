@@ -13,7 +13,7 @@ return new class extends Migration {
             $table->unsignedBigInteger('child_id');
             $table->unsignedBigInteger('health_care_provider_id');
             $table->string('vaccination_code', 50);
-            $table->string('vaccination_no', 50)->nullable();
+            $table->json('vaccination_nos')->nullable();
             $table->string('verification_code', 10);
             $table->timestamp('expires_at');
             $table->timestamps();

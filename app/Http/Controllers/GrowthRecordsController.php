@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GrowthRecords;
-use Illuminate\Http\Request;
-use App\Models\Child;
+use App\Models\GrowthRecords;  
+use Illuminate\Http\Request;  
+use App\Models\Child;  
+use App\Services\ChildGrowthAssessment;  
+use App\Services\SmsService;
 
 class GrowthRecordsController extends Controller
 {
@@ -244,10 +246,48 @@ class GrowthRecordsController extends Controller
                 'height' => $validated['height'],
             ]);
 
+            // Get child's birth date and gender
+            $child = Child::find($childId);
+            if (!$child) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Child not found.',
+                ], 404);
+            }
+
+            // Assess growth
+            $growthAssessment = ChildGrowthAssessment::assessGrowth(
+                $validated['weight'],
+                $child->date_of_birth,
+                $child->gender
+            );
+
+            logger('Child birth date: ' . $child->date_of_birth);
+            logger('Child gender: ' . $child->gender);
+            logger('Growth assessment: ' . json_encode($growthAssessment));
+            logger('Child phone number: ' . $child->phoneNo);
+
+            // Send SMS if underweight or overweight
+            if ($growthAssessment['status'] == 'Underweight' || $growthAssessment['status'] == 'Overweight'  || $growthAssessment['status'] == 'Severe Underweight') {
+                logger('Sending SMS');
+                if ($child->phoneNo) {
+                    $smsService = new SmsService();
+                    $message = "Your child is " . strtolower($growthAssessment['status']) . ". Recommendation: " . $growthAssessment['recommendation'];
+                    $smsSent = $smsService->send($child->phoneNo, $message);
+                } else {
+                    $smsSent = false;
+                }
+            } else {
+                logger('Not sending SMS');
+                $smsSent = false;
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Data stored successfully',
-                'data' => $growthRecord
+                'data' => $growthRecord,
+                'growth_assessment' => $growthAssessment,
+                'sms_sent' => (bool)$smsSent,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -277,9 +317,39 @@ class GrowthRecordsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, GrowthRecords $growthRecords)
+    public function update(Request $request, $id)
     {
-        //
+        try {
+            $validated = $request->validate([
+                'height' => 'required|numeric',
+                'weight' => 'required|numeric',
+            ]);
+
+            $growthRecord = GrowthRecords::find($id);
+
+            if (!$growthRecord) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Growth record not found.',
+                ], 404);
+            }
+
+            $growthRecord->height = $validated['height'];
+            $growthRecord->weight = $validated['weight'];
+            $growthRecord->save();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Growth record updated successfully.',
+                'data' => $growthRecord,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error updating growth record.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -299,13 +369,22 @@ class GrowthRecordsController extends Controller
     public function getGrowthRecordDetails($childId)
     {
         try {
+            $child = Child::find($childId);
+            if (!$child) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Child not found.',
+                ], 404);
+            }
+
             $growthRecords = GrowthRecords::where('child_id', $childId)
-                ->select('child_id', 'height', 'weight', 'created_at')
+                ->select('id', 'height', 'weight', 'created_at')
                 ->orderBy('created_at', 'desc')
                 ->get()
-                ->map(function ($record) {
+                ->map(function ($record) use ($child) {
                     return [
-                        'child_no' => $record->child_id,
+                        'id' => $record->id,
+                        'child_no' => $child->childNo,
                         'height' => $record->height,
                         'weight' => $record->weight,
                         'date' => $record->created_at->format('Y-m-d')

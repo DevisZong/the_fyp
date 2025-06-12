@@ -1,0 +1,44 @@
+[
+  {
+    "childNo": "C001",
+    "childName": "John Doe",
+    "date_of_birth": "2024-01-01",
+    "gender": "male",
+    "birthWeight": 3.5,
+    "birthHeight": 50,
+    "fatherName": "Michael Doe",
+    "motherName": "Jane Doe",
+    "birthFacility": "City Hospital",
+    "birthAttendant": "Nurse A",
+    "email": "parent1@example.com",
+    "phoneNo": "0712345678",
+    "address": {
+      "street": "123 Main St",
+      "city": "Nairobi",
+      "country": "Kenya"
+    },
+    "motherAge": 30,
+    "health_care_provider_id": 1
+  },
+  {
+    "childNo": "C002",
+    "childName": "Mary Jane",
+    "date_of_birth": "2023-12-15",
+    "gender": "female",
+    "birthWeight": 3.2,
+    "birthHeight": 48,
+    "fatherName": "Peter Jane",
+    "motherName": "Anna Jane",
+    "birthFacility": "County Hospital",
+    "birthAttendant": "Midwife B",
+    "email": "parent2@example.com",
+    "phoneNo": "0723456789",
+    "address": {
+      "street": "456 Second St",
+      "city": "Mombasa",
+      "country": "Kenya"
+    },
+    "motherAge": 28,
+    "health_care_provider_id": 1
+  }
+]

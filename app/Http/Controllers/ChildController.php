@@ -258,10 +258,25 @@ class ChildController extends Controller
             // Send SMS to parent with credentials and vaccination info
             $this->sendWelcomeSms($child, $validated['phoneNo'], $validated['childNo'], $validated['fatherName']);
 
-            return response()->json([
+            // Generate appointments for the new child
+             \Illuminate\Support\Facades\Artisan::call('appointments:generate', ['childId' => $child->id]);
+
+            // Create Vitamin and Deworming sessions
+            $dateOfBirth = $child->date_of_birth;
+            for ($i = 0; $i < 10; $i++) {
+                $sessionDate = \Carbon\Carbon::parse($dateOfBirth)->addMonths(6 * $i);
+                \App\Models\VitaminAndDeworming::create([
+                    'child_id' => $child->id,
+                    'Vitamin_A' => false,
+                    'Deworming' => false,
+                    'status' => 'inasubiri',
+                ]);
+            }
+
+             return response()->json([
                 'status' => 'success',
-                'message' => 'Child created successfully',
-                // 'child' => $child,
+                'message' => 'Child created successfully. Appointments generated.',
+                'child' => $child,
                 'credentials_info' => [
                     'username' => $validated['childNo'],
                     'note' => 'Please use your child number as username and father\'s name as password to login.'

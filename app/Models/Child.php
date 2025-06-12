@@ -72,15 +72,113 @@ class Child extends Model
     protected static function booted()
     {
         static::created(function ($child) {
+            $ageInWeeks = $child->date_of_birth->diffInWeeks(now());
+            $vaccinationSchedule = [
+                0 => ['BCG', 'bOPVO'],
+                6 => ['bOPV-1', 'Rota-1', 'DPT-HepB-Hib-1', 'PCV13-1'],
+                10 => ['bOPV-2', 'Rota-2', 'DPT-HepB-Hib-2', 'PCV13-2'],
+                14 => ['bOPV-3', 'Rota-3', 'DPT-HepB-Hib-3', 'PCV13-3', 'IPV'],
+                39 => ['Surua Rubella-1'],
+                78 => ['Surua Rubella-3']
+            ];
+
+            // Check if this child was created by the factory
+            $isFactoryCreated = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 15);
+            $isFromFactory = collect($isFactoryCreated)->contains(function ($trace) {
+                return str_contains($trace['file'] ?? '', 'Factory.php') ||
+                    str_contains($trace['file'] ?? '', 'ChildSeeder.php') ||
+                    str_contains($trace['class'] ?? '', 'Factory');
+            });
+
             foreach (VaccinationSeeder::getVaccinationCodes() as $code) {
+                $status = 'inasubiri';
+                $vaccineWeek = null;
+
+                // Find which week this vaccine belongs to
+                foreach ($vaccinationSchedule as $week => $vaccines) {
+                    if (in_array($code, $vaccines)) {
+                        $vaccineWeek = $week;
+                        break;
+                    }
+                }
+
+                if ($vaccineWeek !== null) {
+                    if ($ageInWeeks > $vaccineWeek + 1) {
+                        // If the child is past the vaccination week + grace period
+                        if ($isFromFactory) {
+                            // For factory-created children: 70% chance of having received the vaccine, 30% chance of having missed it
+                            $status = fake()->boolean(70) ? 'imekamilika' : 'amekosa';
+                        } else {
+                            // For regular children: Always mark as missed if past due
+                            $status = 'amekosa';
+                        }
+                    } elseif ($ageInWeeks >= $vaccineWeek && $isFromFactory) {
+                        // Only factory-created children can have random completion in current week
+                        $status = fake()->boolean(30) ? 'imekamilika' : 'inasubiri';
+                    }
+                }
+
                 Vaccination::create([
                     'child_id' => $child->id,
                     'vaccination_code' => $code,
-                    'vaccination_no' => null,
-                    'status' => false
+                    'vaccination_no' => $status === 'imekamilika' ? fake()->numerify('VAC####') : null,
+                    'Hali' => $status,
+                    'health_care_provider_id' => $status === 'imekamilika' ? HealthCareProvider::inRandomOrder()->first()->id : null
                 ]);
             }
         });
+    }
+
+    public function getVaccinationStatus($vaccinationCode)
+    {
+        $vaccination = $this->vaccination()->where('vaccination_code', $vaccinationCode)->first();
+
+        if (!$vaccination) {
+            return 'pending'; // Or handle the case where the vaccination code is not found
+        }
+
+        if ($vaccination->status === 'received') {
+            return 'received';
+        }
+
+        // Calculate the age in weeks
+        $ageInWeeks = $this->getAgeInWeeksAttribute();
+
+        // Get the vaccination schedule
+        $vaccinationSchedule = [
+            'BCG' => 0,
+            'bOPVO' => 0,
+            'bOPV-1' => 6,
+            'Rota-1' => 6,
+            'DPT-HepB-Hib-1' => 6,
+            'PCV13-1' => 6,
+            'bOPV-2' => 10,
+            'Rota-2' => 10,
+            'DPT-HepB-Hib-2' => 10,
+            'PCV13-2' => 10,
+            'bOPV-3' => 14,
+            'Rota-3' => 14,
+            'DPT-HepB-Hib-3' => 14,
+            'PCV13-3' => 14,
+            'IPV' => 14,
+            'Surua Rubella-1' => 39,
+            'Surua Rubella-2' => 78,
+        ];
+
+        // Check if the vaccination is in the schedule
+        if (!isset($vaccinationSchedule[$vaccinationCode])) {
+            return 'unknown'; // Or handle the case where the vaccination code is not in the schedule
+        }
+
+        // Get the recommended week for the vaccination
+        $recommendedWeek = $vaccinationSchedule[$vaccinationCode];
+
+        // Check if the vaccination is missed
+        if ($ageInWeeks > $recommendedWeek + 1) {
+            return 'missed';
+        }
+
+        return 'pending';
     }
 
     public function vitaminAndDeworming()

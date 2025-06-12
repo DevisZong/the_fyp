@@ -28,5 +28,7 @@ class DatabaseSeeder extends Seeder
         $this->call(GrowthRecordsSeeder::class);
         $this->call(VaccinationSeeder::class);
         $this->call(UserSeeder::class);
+        $this->call(FoodFactSeeder::class);
+        $this->call(VitaminAndDewormingSeeder::class);
     }
 }

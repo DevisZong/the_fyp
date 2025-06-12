@@ -25,13 +25,9 @@ class ChildSeeder extends Seeder
             $user->assignRole('child');
             unset($childData['date_of_birth_formatted']);
             $childData['user_id'] = $user->id;
-            $child = Child::create($childData);
-            foreach (\Database\Seeders\VaccinationSeeder::getVaccinationCodes() as $code) {
-                Vaccination::factory()->create([
-                    'child_id' => $child->id,
-                    'vaccination_code' => $code,
-                ]);
-            }
+            $child = Child::create($childData);            // Vaccinations are automatically created by the Child model's booted method
+            // Generate appointments for the new child
+            \Illuminate\Support\Facades\Artisan::call('appointments:generate');
         }
     }
 }

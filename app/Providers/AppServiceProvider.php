@@ -23,11 +23,13 @@ class AppServiceProvider extends ServiceProvider
     {
         if (App::runningInConsole()) {
             $this->app->booted(function () {
-                // app(Schedule::class)->command('app:test-sms-reminder')->everyMinute(); // run every minute
-                app(Schedule::class)->command('vaccinations:remind')->everyMinute(); // vaccination reminders daily
-                app(Schedule::class)->command('checkups:monthly-reminder')->everyMinute(); // monthly checkup reminders
+                // app(Schedule::class)->command('app:test-sms-reminder')->daily(); // run daily
+                // app(Schedule::class)->command('vaccinations:remind')->daily(); // vaccination reminders daily
+                app(Schedule::class)->command('checkups:monthly-reminder')->daily(); // monthly checkup reminders
+                app(Schedule::class)->command('appointments:send-notifications')->everyMinute(); // unified appointment reminders daily
+                app(Schedule::class)->command('vaccinations:update-missed')->daily(); // Check for missed vaccinations daily
+                app(Schedule::class)->command('foodfacts:send-notifications')->everyMinute(); // monthly food fact notifications
             });
         }
     }
 }
-

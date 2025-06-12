@@ -4,7 +4,7 @@
 namespace App\Services;
 
 class SmsService
-{ 
+{
     public function send($phone, $message): bool
     {
         $username = 'fyp';
@@ -35,9 +35,9 @@ class SmsService
         $curl_error = curl_error($ch);
         // Debug output for testing if cURL is reached
         if (function_exists('logger')) {
+            logger()->info('Sending SMS to: ' . $phone . ' with message: ' . $message);
             logger()->info('SMS cURL debug', ['http_code' => $http_code, 'response' => $response]);
         }
-        var_dump($http_code, $response);
         curl_close($ch);
 
         if ($curl_error) {

@@ -1,0 +1,65 @@
+[
+  {
+    "childNo": "C1001",
+    "childName": "Test Child One",
+    "date_of_birth": "2025-01-01",
+    "gender": "Male",
+    "birthWeight": 3.2,
+    "birthHeight": 50,
+    "fatherName": "John Doe",
+    "motherName": "Jane Doe",
+    "birthFacility": "Health Center A",
+    "birthAttendant": "Nurse A",
+    "email": "parent1@example.com",
+    "phoneNo": "+12345678901",
+    "address": {
+      "street": "123 Main St",
+      "ward": "Ward 1",
+      "Region": "Region A"
+    },
+    "motherAge": 30,
+    "health_care_provider_id": 1
+  },
+  {
+    "childNo": "C1002",
+    "childName": "Test Child Two",
+    "date_of_birth": "2024-12-25",
+    "gender": "Female",
+    "birthWeight": 3.0,
+    "birthHeight": 48,
+    "fatherName": "Mark Smith",
+    "motherName": "Mary Smith",
+    "birthFacility": "Health Center B",
+    "birthAttendant": "Midwife B",
+    "email": "parent2@example.com",
+    "phoneNo": "+12345678902",
+    "address": {
+      "street": "456 Elm St",
+      "ward": "Ward 2",
+      "Region": "Region B"
+    },
+    "motherAge": 28,
+    "health_care_provider_id": 1
+  },
+  {
+    "childNo": "C1003",
+    "childName": "Test Child Three",
+    "date_of_birth": "2024-12-20",
+    "gender": "Male",
+    "birthWeight": 3.5,
+    "birthHeight": 52,
+    "fatherName": "Paul Johnson",
+    "motherName": "Paula Johnson",
+    "birthFacility": "Health Center C",
+    "birthAttendant": "Doctor C",
+    "email": "parent3@example.com",
+    "phoneNo": "+12345678903",
+    "address": {
+      "street": "789 Oak St",
+      "ward": "Ward 3",
+      "Region": "Region C"
+    },
+    "motherAge": 32,
+    "health_care_provider_id": 1
+  }
+]

@@ -13,13 +13,15 @@ class Vaccination extends Model
         'child_id',
         'vaccination_code',
         'vaccination_no',
-        'status',
+        'Hali',
         'health_care_provider_id'
     ];
 
-    protected $casts = ['status' => 'boolean'];
+    protected $casts = [
+        'Hali' => 'string',
+    ];
 
-    public function child()
+     public function child()
     {
         return $this->belongsTo(Child::class);
     }

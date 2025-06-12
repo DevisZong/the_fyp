@@ -9,10 +9,11 @@ use App\Models\Child;
 
 class VaccinationSeeder extends Seeder
 {
+    const MAX_VACCINATION_NO_USES = 3;
+
     private $vaccinationCodes = [
         'BCG',
         'bOPVO',
-        'BCG-2', // From "Measure-motometer" in your table
         'bOPV-1',
         'Rota-1',
         'DPT-HepB-Hib-1',
@@ -49,14 +50,17 @@ class VaccinationSeeder extends Seeder
     public function createVaccinationRecords($childId)
     {
         foreach ($this->vaccinationCodes as $code) {
-            Vaccination::firstOrCreate([
-                'child_id' => $childId,
-                'vaccination_code' => $code
-            ], [
-                'vaccination_no' => null,
-                'status' => false,
-                'health_care_provider_id' => null
-            ]);
+            for ($i = 1; $i <= self::MAX_VACCINATION_NO_USES; $i++) {
+                $vaccinationNo = $code . '-' . $i;
+                Vaccination::firstOrCreate([
+                    'child_id' => $childId,
+                    'vaccination_code' => $code,
+                ], [
+                    // 'Hali' => 'inasubiri',
+                    // 'health_care_provider_id' => 1,
+                    // 'vaccination_no' => null
+                ]);
+            }
         }
     }
 }

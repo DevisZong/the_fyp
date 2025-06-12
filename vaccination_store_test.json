@@ -1,0 +1,6 @@
+{
+    "child_id": 1,
+    "health_care_provider_id": 1,
+    "vaccination_codes": ["BCG", "bOPVO"],
+    "vaccination_nos": ["BCG-1", "bOPVO-1"]
+}

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('child_id')->constrained()->onDelete('cascade');
             $table->boolean('Vitamin_A')->default(false);
             $table->boolean('Deworming')->default(false);
-            $table->boolean('status')->default(false);
+            $table->enum('status', ['inasubiri', 'imekamilika', 'amekosa'])->default('inasubiri');
             $table->timestamps();
         });
     }

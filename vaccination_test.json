@@ -1,0 +1,30 @@
+{
+    "storeWithVerification": {
+        "valid": {
+            "child_id": 1,
+            "health_care_provider_id": 1,
+            "vaccination_codes": ["BCG", "bOPVO"],
+            "vaccination_nos": ["VAC-6765", "VAC-8080"]
+        },
+        "invalid": {
+            "child_id": 999,
+            "health_care_provider_id": 999,
+            "vaccination_codes": ["INVALID", "INVALID"],
+            "vaccination_nos": ["INVALID", "INVALID"]
+        }
+    },
+    "verifyAndStoreVaccination": {
+        "valid": {
+            "child_id": 1,
+            "vaccination_codes": ["BCG", "bOPVO"],
+            "vaccination_nos": ["VAC-6765", "VAC-8080"],
+            "verification_code": "123456"
+        },
+        "invalid": {
+            "child_id": 999,
+            "vaccination_codes": ["INVALID", "INVALID"],
+            "vaccination_nos": ["INVALID", "INVALID"],
+            "verification_code": "INVALID"
+        }
+    }
+}
