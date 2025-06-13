@@ -121,8 +121,8 @@ class VaccinationController extends Controller
 
     // Store vaccination with parent verification via SMS (no Redis, uses DB)
 
-// Improved storeWithVerification function
- public function storeWithVerification(Request $request)
+    // Improved storeWithVerification function
+    public function storeWithVerification(Request $request)
     {
         $validated = $request->validate([
             'child_id' => 'required|exists:children,id',
@@ -311,14 +311,13 @@ class VaccinationController extends Controller
     }
 
     // Show vaccination details to the healthcare provider
-    public function show(Request $request)
+    public function show($childId)
     {
         try {
-            $validated = $request->validate([
-                'child_id' => 'required|exists:children,id'
-            ]);
+            // Validate that the child exists
+            $child = Child::findOrFail($childId);
 
-            $Data = Vaccination::where('child_id', $validated['child_id'])
+            $Data = Vaccination::where('child_id', $childId)
                 ->get(['vaccination_code', 'updated_at', 'Hali']);
             return response()->json([
                 'message' => 'Vaccination records fetched successfully',

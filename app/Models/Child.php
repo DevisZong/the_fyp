@@ -72,6 +72,16 @@ class Child extends Model
     protected static function booted()
     {
         static::created(function ($child) {
+            // Create initial growth record with birth measurements
+            GrowthRecords::create([
+                'child_id' => $child->id,
+                'weight' => $child->birthWeight,
+                'height' => $child->birthHeight,
+                'created_at' => $child->date_of_birth,
+                'updated_at' => $child->date_of_birth
+            ]);
+
+            // Create vaccination schedule
             $ageInWeeks = $child->date_of_birth->diffInWeeks(now());
             $vaccinationSchedule = [
                 0 => ['BCG', 'bOPVO'],

@@ -56,29 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 
-Route::prefix('vaccinations')->group(function () {
-    // Get vaccinations (requires child_id in request)
-    Route::get('/', [VaccinationController::class, 'index']);
-
-    // Create vaccination record
-    Route::post('/', [VaccinationController::class, 'store']);
-
-    // Get status report
-    Route::get('/status-report', [VaccinationController::class, 'statusReport']);
-
-    // Check vaccination_no availability
-    Route::get('/check-availability', [VaccinationController::class, 'checkAvailability']);
-
-    // Update vaccination
-    Route::put('/update', [VaccinationController::class, 'update']);
-
-    // Delete vaccination
-    Route::delete('/delete', [VaccinationController::class, 'destroy']);
-});
-// Route::get('/childProfile', [ChildController::class, 'getChildProfile']);
-
 //Children Routes
-
 Route::post('/childLogin', [ChildAuthController::class, 'login']);
 
 Route::middleware(['auth:sanctum', 'role:child'])->prefix('children')->group(function () {
@@ -89,9 +67,10 @@ Route::middleware(['auth:sanctum', 'role:child'])->prefix('children')->group(fun
     Route::get('/vitaminAndDeworming', [VitaminAndDewormingController::class, 'show']);
     Route::get('/growthChart', [GrowthRecordsController::class, 'getGrowthChartByToken']);
     Route::get('/growthSummary', [ChildController::class, 'growthRecordSummary']);
-    Route::post('/changePassword', [ChildAuthController::class, 'changePassword']);
+    Route::post('/change-password', [ChildAuthController::class, 'changePassword']);
     Route::post('/logout', [ChildAuthController::class, 'logout']);
 });
+
 
 //Admin Routes
 Route::post('/adminLogin', [AuthController::class, 'login'])->middleware('throttle:5,1');
@@ -111,12 +90,17 @@ Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->
     Route::post('/children', [ChildController::class, 'store']);
     //child-details file 
     Route::get('/children/{child}', [ChildController::class, 'show']);
+    Route::get('/child-profile/{childId}', [ChildController::class, 'getHealthcareChildProfile']);
+    //Growth Records Routes
     Route::post('/growth-records/{childId}', [GrowthRecordsController::class, 'store']);
     Route::get('/growth-details/{childId}', [GrowthRecordsController::class, 'getGrowthRecordDetails']);
     Route::put('/growth-records/update/{childId}', [GrowthRecordsController::class, 'update']);
     Route::get('/chart-data/{childId}', [GrowthRecordsController::class, 'getGrowthChartByChildId']);
+    // Vaccination Routes
+    Route::get('/vaccinations/{childId}', [VaccinationController::class, 'show']);
     Route::post('/vaccinations/store-with-verification', [VaccinationController::class, 'storeWithVerification']);
     Route::post('/vaccinations/verify-and-store', [VaccinationController::class, 'verifyAndStoreVaccination']);
+    // vitamin and deworming
     Route::get('/vitamin-deworming/{childId}', [VitaminAndDewormingController::class, 'showByChildId']);
     Route::post('/vitamin-deworming/{childId}', [VitaminAndDewormingController::class, 'store']);
     //end

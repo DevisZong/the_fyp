@@ -259,7 +259,7 @@ class ChildController extends Controller
             $this->sendWelcomeSms($child, $validated['phoneNo'], $validated['childNo'], $validated['fatherName']);
 
             // Generate appointments for the new child
-             \Illuminate\Support\Facades\Artisan::call('appointments:generate', ['childId' => $child->id]);
+            \Illuminate\Support\Facades\Artisan::call('appointments:generate', ['childId' => $child->id]);
 
             // Create Vitamin and Deworming sessions
             $dateOfBirth = $child->date_of_birth;
@@ -273,7 +273,7 @@ class ChildController extends Controller
                 ]);
             }
 
-             return response()->json([
+            return response()->json([
                 'status' => 'success',
                 'message' => 'Child created successfully. Appointments generated.',
                 'child' => $child,
@@ -410,6 +410,38 @@ class ChildController extends Controller
             }
         } catch (\Exception $e) {
             // Optionally log error
+        }
+    }
+
+    /**
+     * Get child profile data for healthcare providers
+     */
+    public function getHealthcareChildProfile($childId)
+    {
+        try {
+            $child = Child::findOrFail($childId);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'childNo' => $child->childNo,
+                    'childName' => $child->childName,
+                    'gender' => $child->gender,
+                    'date_of_birth' => $child->date_of_birth,
+                    'fatherName' => $child->fatherName,
+                    'motherName' => $child->motherName,
+                    'address' => [
+                        'ward' => $child->address['ward'] ?? null
+                    ],
+                    'phoneNo' => $child->phoneNo
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error fetching child profile',
+                'error' => $e->getMessage()
+            ], 404);
         }
     }
 }
