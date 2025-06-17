@@ -1,0 +1,91 @@
+{
+  "description": "Database validation queries for your JSON request",
+  "your_json": {
+    "child_id": 3,
+    "health_care_provider_id": 2,
+    "vaccination_codes": ["BCG", "bOPVO"],
+    "vaccination_nos": ["VAC-8080", "VAC-8080"]
+  },
+  
+  "validation_queries": [
+    {
+      "purpose": "Check if child exists and has phone number",
+      "query": "SELECT id, childName, phoneNo FROM children WHERE id = 3;"
+    },
+    {
+      "purpose": "Check if healthcare provider exists", 
+      "query": "SELECT id, name FROM health_care_providers WHERE id = 2;"
+    },
+    {
+      "purpose": "Check if vaccination codes exist and are available",
+      "query": "SELECT vaccination_code, Hali, vaccination_no FROM vaccinations WHERE vaccination_code IN ('BCG', 'bOPVO') AND Hali = 'inasubiri' AND vaccination_no IS NULL;"
+    },
+    {
+      "purpose": "Check vaccination number usage count",
+      "query": "SELECT vaccination_no, COUNT(*) as usage_count FROM vaccinations WHERE vaccination_no = 'VAC-8080' GROUP BY vaccination_no;"
+    },
+    {
+      "purpose": "Check if vaccination number is assigned to different codes",
+      "query": "SELECT vaccination_no, vaccination_code FROM vaccinations WHERE vaccination_no = 'VAC-8080';"
+    }
+  ],
+  
+  "expected_results": [
+    {
+      "query": "Child query",
+      "should_return": "1 row with valid phoneNo (not null/empty)"
+    },
+    {
+      "query": "Healthcare provider query", 
+      "should_return": "1 row with provider details"
+    },
+    {
+      "query": "Vaccination codes query",
+      "should_return": "2 rows (BCG and bOPVO) with Hali='inasubiri' and vaccination_no=NULL"
+    },
+    {
+      "query": "Vaccination number usage",
+      "should_return": "Either no rows (unused) or usage_count < 3"
+    },
+    {
+      "query": "Vaccination number assignment",
+      "should_return": "Either no rows or rows with same vaccination codes you're using"
+    }
+  ],
+  
+  "potential_errors": [
+    {
+      "error": "Child not found",
+      "cause": "child_id: 3 doesn't exist",
+      "solution": "Use existing child ID or create child record"
+    },
+    {
+      "error": "Parent or phone number not found",
+      "cause": "Child doesn't have phoneNo or isn't linked to a user",
+      "solution": "Update child record with valid phoneNo and user_id"
+    },
+    {
+      "error": "The selected vaccination codes.0 is invalid",
+      "cause": "BCG doesn't exist in vaccinations table",
+      "solution": "Insert vaccination record or use existing vaccination_code"
+    },
+    {
+      "error": "This vaccination number has reached the maximum usage limit (3 times)",
+      "cause": "VAC-8080 already used 3 times",
+      "solution": "Use different vaccination number"
+    },
+    {
+      "error": "This vaccination number is already assigned to vaccination code 'OTHER_CODE'",
+      "cause": "VAC-8080 was previously used for different vaccination code",
+      "solution": "Use different vaccination number or use same vaccination codes"
+    }
+  ],
+  
+  "recommendations": [
+    "Use unique vaccination numbers for each vaccination",
+    "Verify database state before testing",
+    "Consider using sequential numbers like VAC-8080, VAC-8081",
+    "Ensure child has valid phone number for SMS",
+    "Test with known good data first"
+  ]
+}

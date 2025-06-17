@@ -48,7 +48,13 @@ class User extends Authenticatable
         ];
     }
 
-    public function child(){
+    public function child()
+    {
         return $this->hasOne(Child::class);
+    }
+
+    public function healthCareProvider()
+    {
+        return $this->hasOne(HealthCareProvider::class);
     }
 }

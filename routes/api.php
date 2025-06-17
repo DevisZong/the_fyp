@@ -11,6 +11,7 @@ use App\Http\Controllers\HealthCareProviderController;
 use App\Http\Controllers\VitaminAndDewormingController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\FoodFactController;
+use App\Models\HealthCareProvider;
 use PHPUnit\TextUI\Help;
 use Spatie\Permission\Contracts\Role;
 
@@ -77,8 +78,16 @@ Route::post('/adminLogin', [AuthController::class, 'login'])->middleware('thrott
 
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/children', [ChildController::class, 'index']);
+    Route::get('/healthcare-providers', [HealthCareProviderController::class, 'index']);
     Route::post('/healthcare-providers', [HealthCareProviderController::class, 'store']);
+    Route::put('/healthcare-providers/{id}', [HealthCareProviderController::class, 'update']);
+    Route::delete('/healthcare-providers/{id}', [HealthCareProviderController::class, 'destroy']);
     Route::put('/child-update', [ChildController::class, 'update']);
+    Route::get('/activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index']);
+    Route::get('/users', [AuthController::class, 'getAllUsers']);
+    Route::post('/search-users', [AuthController::class, 'searchUsers']);
+    Route::post('/reset-password', [AuthController::class, 'resetUserPassword']);
+    Route::post('/logout', [AuthController::class, 'logout']);
 });
 
 
@@ -109,6 +118,28 @@ Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->
 });
 
 
+// Dashboard Routes (Healthcare Provider Dashboard)
+Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('dashboard')->group(function () {
+    // Dashboard statistics
+    Route::get('/stats', [App\Http\Controllers\DashboardController::class, 'getStats']);
+
+    // Registration trends for charts
+    Route::get('/registration-trends', [App\Http\Controllers\DashboardController::class, 'getRegistrationTrends']);
+    Route::get('/registration-trends-demo', [App\Http\Controllers\DashboardController::class, 'getRegistrationTrendsDemo']);
+
+    // Create sample data for better visualization
+    Route::post('/create-sample-data', [App\Http\Controllers\DashboardController::class, 'createSampleData']);
+
+    // Children data for dashboard
+    Route::get('/children', [ChildController::class, 'getDashboardChildren']);
+    Route::get('/children/recent', [ChildController::class, 'getRecentChildren']);
+    Route::get('/children/search', [ChildController::class, 'searchChildren']);
+
+    // Appointments for dashboard
+    Route::get('/appointments', [AppointmentController::class, 'getDashboardAppointments']);
+    Route::get('/appointments/today', [AppointmentController::class, 'getTodayAppointments']);
+});
+
 
 // Activity Logs Route
 Route::middleware(['auth:sanctum', 'role:admin'])->get('/activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index']);
@@ -118,5 +149,6 @@ Route::middleware(['auth:sanctum', 'role:admin'])->get('/activity-logs', [\App\H
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/appointments', [AppointmentController::class, 'getAppointments']);
     Route::post('/appointments/send-notifications', [AppointmentController::class, 'sendNotifications']);
+    Route::get('/foodfacts', [FoodFactController::class, 'index']);
     Route::get('/foodfact/current-month', [FoodFactController::class, 'currentMonthDiet']);
 });

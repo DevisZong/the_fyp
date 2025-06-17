@@ -1,0 +1,114 @@
+{
+  "description": "Test data for storeWithVerification function",
+  "endpoint": "POST /api/vaccinations/store-with-verification",
+  "test_cases": [
+    {
+      "name": "Valid single vaccination request",
+      "payload": {
+        "child_id": 1,
+        "health_care_provider_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"]
+      },
+      "expected_response": {
+        "status": 200,
+        "message": "Verification code sent to parent. Awaiting confirmation.",
+        "verification_code": "6-digit number"
+      }
+    },
+    {
+      "name": "Valid multiple vaccinations request",
+      "payload": {
+        "child_id": 1,
+        "health_care_provider_id": 1,
+        "vaccination_codes": ["BCG", "OPV0", "HepB0"],
+        "vaccination_nos": ["VAC001", "VAC002", "VAC003"]
+      },
+      "expected_response": {
+        "status": 200,
+        "message": "Verification code sent to parent. Awaiting confirmation.",
+        "verification_code": "6-digit number"
+      }
+    },
+    {
+      "name": "Invalid - missing child_id",
+      "payload": {
+        "health_care_provider_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"]
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "child_id": ["The child id field is required."]
+        }
+      }
+    },
+    {
+      "name": "Invalid - non-existent child_id",
+      "payload": {
+        "child_id": 999999,
+        "health_care_provider_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"]
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "child_id": ["The selected child id is invalid."]
+        }
+      }
+    },
+    {
+      "name": "Invalid - mismatched arrays",
+      "payload": {
+        "child_id": 1,
+        "health_care_provider_id": 1,
+        "vaccination_codes": ["BCG", "OPV0"],
+        "vaccination_nos": ["VAC001"]
+      },
+      "expected_response": {
+        "status": 400,
+        "error": "The number of vaccination codes must match the number of vaccination numbers."
+      }
+    },
+    {
+      "name": "Invalid - empty vaccination_codes array",
+      "payload": {
+        "child_id": 1,
+        "health_care_provider_id": 1,
+        "vaccination_codes": [],
+        "vaccination_nos": []
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "vaccination_codes": ["The vaccination codes field must have at least 1 items."]
+        }
+      }
+    },
+    {
+      "name": "Invalid - vaccination number exceeded usage limit",
+      "payload": {
+        "child_id": 1,
+        "health_care_provider_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["OVERUSED_VAC_NO"]
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "vaccination_nos.0": ["This vaccination number has reached the maximum usage limit (3 times)"]
+        }
+      }
+    }
+  ],
+  "notes": [
+    "Make sure child_id exists in children table",
+    "Make sure health_care_provider_id exists in health_care_providers table", 
+    "Make sure vaccination_codes exist in vaccinations table",
+    "Child must have a valid phoneNo for SMS",
+    "Parent (user) must be associated with the child",
+    "SMS service must be properly configured"
+  ]
+}

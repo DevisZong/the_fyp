@@ -258,24 +258,9 @@ class ChildController extends Controller
             // Send SMS to parent with credentials and vaccination info
             $this->sendWelcomeSms($child, $validated['phoneNo'], $validated['childNo'], $validated['fatherName']);
 
-            // Generate appointments for the new child
-            \Illuminate\Support\Facades\Artisan::call('appointments:generate', ['childId' => $child->id]);
-
-            // Create Vitamin and Deworming sessions
-            $dateOfBirth = $child->date_of_birth;
-            for ($i = 0; $i < 10; $i++) {
-                $sessionDate = \Carbon\Carbon::parse($dateOfBirth)->addMonths(6 * $i);
-                \App\Models\VitaminAndDeworming::create([
-                    'child_id' => $child->id,
-                    'Vitamin_A' => false,
-                    'Deworming' => false,
-                    'status' => 'inasubiri',
-                ]);
-            }
-
             return response()->json([
                 'status' => 'success',
-                'message' => 'Child created successfully. Appointments generated.',
+                'message' => 'Child created successfully. Appointments generated automatically.',
                 'child' => $child,
                 'credentials_info' => [
                     'username' => $validated['childNo'],
@@ -442,6 +427,163 @@ class ChildController extends Controller
                 'message' => 'Error fetching child profile',
                 'error' => $e->getMessage()
             ], 404);
+        }
+    }
+
+    /**
+     * Get children data for dashboard with pagination and search
+     */
+    public function getDashboardChildren(Request $request)
+    {
+        try {
+            $query = Child::with(['user', 'vaccinations', 'appointments']);
+
+            // Add search functionality
+            if ($request->has('search') && !empty($request->search)) {
+                $searchTerm = $request->search;
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('childName', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('fatherName', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('motherName', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('phoneNo', 'LIKE', "%{$searchTerm}%");
+                });
+            }
+
+            $children = $query->orderBy('created_at', 'desc')->get();
+
+            // Format data for dashboard
+            $formattedChildren = $children->map(function ($child) {
+                return [
+                    'id' => $child->id,
+                    'name' => $child->childName,
+                    'age' => $child->calculateAge(),
+                    'guardian' => $child->fatherName . ' / ' . $child->motherName,
+                    'phone' => $child->phoneNo,
+                    'lastVisit' => $child->appointments()->latest()->first()?->appointment_date ?? 'No visits',
+                    'nextVaccination' => $this->getNextVaccination($child),
+                    'registrationDate' => $child->created_at->format('Y-m-d')
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedChildren
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch children',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get recent children (last 5 registered)
+     */
+    public function getRecentChildren()
+    {
+        try {
+            $children = Child::with(['user', 'vaccinations', 'appointments'])
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+
+            $formattedChildren = $children->map(function ($child) {
+                return [
+                    'id' => $child->id,
+                    'name' => $child->childName,
+                    'age' => $child->calculateAge(),
+                    'guardian' => $child->fatherName . ' / ' . $child->motherName,
+                    'phone' => $child->phoneNo,
+                    'lastVisit' => $child->appointments()->latest()->first()?->appointment_date ?? 'No visits',
+                    'nextVaccination' => $this->getNextVaccination($child),
+                    'registrationDate' => $child->created_at->format('Y-m-d')
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedChildren
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch recent children',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Search children for dashboard
+     */
+    public function searchChildren(Request $request)
+    {
+        try {
+            $searchTerm = $request->get('q', '');
+
+            if (empty($searchTerm)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => []
+                ]);
+            }
+
+            $children = Child::with(['user', 'vaccinations', 'appointments'])
+                ->where(function ($query) use ($searchTerm) {
+                    $query->where('childName', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('fatherName', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('motherName', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('phoneNo', 'LIKE', "%{$searchTerm}%");
+                })
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $formattedChildren = $children->map(function ($child) {
+                return [
+                    'id' => $child->id,
+                    'name' => $child->childName,
+                    'age' => $child->calculateAge(),
+                    'guardian' => $child->fatherName . ' / ' . $child->motherName,
+                    'phone' => $child->phoneNo,
+                    'lastVisit' => $child->appointments()->latest()->first()?->appointment_date ?? 'No visits',
+                    'nextVaccination' => $this->getNextVaccination($child),
+                    'registrationDate' => $child->created_at->format('Y-m-d')
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedChildren
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to search children',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to get next vaccination for a child
+     */
+    private function getNextVaccination($child)
+    {
+        // This is a simplified example - you should implement based on your vaccination schedule
+        $age = $child->calculateAge();
+
+        if ($age < 1) {
+            return 'BCG, Hepatitis B';
+        } elseif ($age < 2) {
+            return 'DPT, Polio';
+        } elseif ($age < 5) {
+            return 'MMR Booster';
+        } elseif ($age < 7) {
+            return 'School Entry Shots';
+        } else {
+            return 'Up to date';
         }
     }
 }

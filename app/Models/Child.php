@@ -5,7 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Vaccination;
+use App\Models\Appointment;
+use App\Models\VitaminAndDeworming;
+use App\Models\VitaminDewormingReminder;
 use Database\Seeders\VaccinationSeeder;
+use Database\Seeders\VitaminAndDewormingSeeder;
 
 class Child extends Model
 {
@@ -69,8 +73,25 @@ class Child extends Model
         return $this->hasMany(Vaccination::class, 'child_id', 'id');
     }
 
+    public function vaccinations()
+    {
+        return $this->hasMany(Vaccination::class, 'child_id', 'id');
+    }
+
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class, 'child_id', 'id');
+    }
+
     protected static function booted()
     {
+        static::creating(function ($child) {
+            // Generate child number based on birth year if not already set
+            if (empty($child->childNo)) {
+                $child->childNo = static::generateChildNumber($child->date_of_birth);
+            }
+        });
+
         static::created(function ($child) {
             // Create initial growth record with birth measurements
             GrowthRecords::create([
@@ -136,7 +157,143 @@ class Child extends Model
                     'health_care_provider_id' => $status === 'imekamilika' ? HealthCareProvider::inRandomOrder()->first()->id : null
                 ]);
             }
+
+            // Create vitamin and deworming schedule (10 visits, every 6 months)
+            $ageInMonths = $child->date_of_birth->diffInMonths(now());
+
+            for ($i = 1; $i <= 10; $i++) {
+                $visitMonth = $i * 6; // 6, 12, 18, 24, ... months
+                $scheduledDate = $child->date_of_birth->copy()->addMonths($visitMonth);
+                $status = 'inasubiri'; // Default for future visits
+                $vitaminA = false;
+                $deworming = false;
+
+                // Only mark as missed if child is significantly past the visit date
+                if ($ageInMonths > $visitMonth + 1) {
+                    // If the child is past the visit month + grace period
+                    if ($isFromFactory) {
+                        // For factory-created children: 70% chance of having received the vitamins, 30% chance of having missed it
+                        $received = fake()->boolean(70);
+                        $status = $received ? 'imekamilika' : 'amekosa';
+                        $vitaminA = $received;
+                        $deworming = $received;
+                    } else {
+                        // For regular children: Always mark as missed if past due
+                        $status = 'amekosa';
+                        $vitaminA = false;
+                        $deworming = false;
+                    }
+                } elseif ($ageInMonths >= $visitMonth && $ageInMonths <= $visitMonth + 1 && $isFromFactory) {
+                    // Only factory-created children can have random completion in current month window
+                    $received = fake()->boolean(30);
+                    $status = $received ? 'imekamilika' : 'inasubiri';
+                    $vitaminA = $received;
+                    $deworming = $received;
+                }
+                // For all other cases (future visits), keep default: status='inasubiri', vitaminA=false, deworming=false
+
+                VitaminAndDeworming::create([
+                    'child_id' => $child->id,
+                    'Vitamin_A' => $vitaminA,
+                    'Deworming' => $deworming,
+                    'status' => $status,
+                    'created_at' => $scheduledDate,
+                    'updated_at' => $scheduledDate
+                ]);
+            }
+
+            // Generate appointments for the new child
+            self::generateAppointmentsForChild($child);
         });
+    }
+
+    /**
+     * Generate a sequential child number based on the birth year
+     * Format: sequential_number/year (e.g., "1/2025", "13/2025")
+     */
+    public static function generateChildNumber($dateOfBirth)
+    {
+        $year = \Carbon\Carbon::parse($dateOfBirth)->year;
+
+        // Get the highest sequential number for children born in the same year
+        $latestChild = static::whereYear('date_of_birth', $year)
+            ->whereRaw("childNo REGEXP '^[0-9]+/{$year}$'")
+            ->orderByRaw('CAST(SUBSTRING_INDEX(childNo, "/", 1) AS UNSIGNED) DESC')
+            ->first();
+
+        // Calculate the next sequential number
+        $sequentialNumber = 1;
+        if ($latestChild && $latestChild->childNo) {
+            $currentNumber = (int) explode('/', $latestChild->childNo)[0];
+            $sequentialNumber = $currentNumber + 1;
+        }
+
+        return $sequentialNumber . '/' . $year;
+    }
+
+    /**
+     * Generate appointments for a specific child
+     */
+    public static function generateAppointmentsForChild($child)
+    {
+        $vaccinationSchedule = [
+            6  => [
+                'bOPV-1',
+                'Rota-1',
+                'DPT-HepB-Hib-1',
+                'PCV13-1'
+            ],
+            10 => [
+                'bOPV-2',
+                'Rota-2',
+                'DPT-HepB-Hib-2',
+                'PCV13-2'
+            ],
+            14 => [
+                'bOPV-3',
+                'Rota-3',
+                'DPT-HepB-Hib-3',
+                'PCV13-3',
+                'IPV'
+            ],
+            39 => [ // 9 months (approx 39 weeks)
+                'Surua Rubella-1'
+            ],
+            78 => [ // 18 months (approx 78 weeks)
+                'Surua Rubella-2'
+            ]
+        ];
+
+        $dob = \Carbon\Carbon::parse($child->date_of_birth);
+        $maxMonths = 60; // 5 years
+
+        // Generate monthly visit appointments
+        for ($month = 1; $month <= $maxMonths; $month++) {
+            $appointmentDate = $dob->copy()->addMonths($month);
+            if ($appointmentDate->isFuture()) {
+                Appointment::firstOrCreate([
+                    'child_id' => $child->id,
+                    'appointment_type' => 'monthly_visit',
+                    'appointment_date' => $appointmentDate->toDateString(),
+                    'appointment_name' => 'Monthly Visit',
+                ]);
+            }
+        }
+
+        // Generate vaccination appointments
+        foreach ($vaccinationSchedule as $weekAge => $vaccines) {
+            $appointmentDate = $dob->copy()->addWeeks($weekAge);
+            if ($appointmentDate->isFuture()) {
+                foreach ($vaccines as $vaccineName) {
+                    Appointment::firstOrCreate([
+                        'child_id' => $child->id,
+                        'appointment_type' => 'vaccination',
+                        'appointment_date' => $appointmentDate->toDateString(),
+                        'appointment_name' => $vaccineName,
+                    ]);
+                }
+            }
+        }
     }
 
     public function getVaccinationStatus($vaccinationCode)
@@ -196,6 +353,11 @@ class Child extends Model
         return $this->hasMany(VitaminAndDeworming::class, 'child_id', 'id');
     }
 
+    public function vitaminDewormingReminders()
+    {
+        return $this->hasMany(VitaminDewormingReminder::class, 'child_id');
+    }
+
     public function healthCareProviders()
     {
         return $this->belongsToMany(HealthCareProvider::class, 'child_health_care_provider');
@@ -223,5 +385,29 @@ class Child extends Model
             return floor($this->age_in_weeks / 4.345);
         }
         return null;
+    }
+
+    /**
+     * Calculate the age of the child in years
+     */
+    public function calculateAge()
+    {
+        if (!$this->date_of_birth) {
+            return 0;
+        }
+
+        return \Carbon\Carbon::parse($this->date_of_birth)->age;
+    }
+
+    /**
+     * Get age in months
+     */
+    public function getAgeInMonths()
+    {
+        if (!$this->date_of_birth) {
+            return 0;
+        }
+
+        return \Carbon\Carbon::parse($this->date_of_birth)->diffInMonths(now());
     }
 }

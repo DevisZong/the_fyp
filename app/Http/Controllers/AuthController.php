@@ -230,4 +230,322 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Admin: Get all users in the system
+     */
+    public function getAllUsers(Request $request)
+    {
+        try {
+            $users = User::with(['roles', 'child', 'healthCareProvider'])->get()->map(function ($user) {
+                $userData = [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'roles' => $user->getRoleNames(),
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ];
+
+                // Add specific details based on role
+                if ($user->hasRole('child') && $user->child) {
+                    $userData['child_details'] = [
+                        'child_name' => $user->child->childName,
+                        'child_no' => $user->child->childNo,
+                        'father_name' => $user->child->fatherName,
+                        'date_of_birth' => $user->child->dateOfBirth,
+                        'gender' => $user->child->gender,
+                    ];
+                }
+
+                if (($user->hasRole('doctor') || $user->hasRole('nurse')) && $user->healthCareProvider) {
+                    $userData['healthcare_details'] = [
+                        'license' => $user->healthCareProvider->license,
+                        'facility' => $user->healthCareProvider->facility,
+                        'contact' => $user->healthCareProvider->contact,
+                        'gender' => $user->healthCareProvider->gender,
+                        'status' => $user->healthCareProvider->status,
+                    ];
+                }
+
+                return $userData;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Users fetched successfully',
+                'data' => $users,
+                'total' => $users->count(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get all users failed: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch users',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin: Reset user password to default
+     */
+    public function resetUserPassword(Request $request)
+    {
+        try {
+            $request->validate([
+                'identifier' => 'required|string',
+                'identifier_type' => 'required|string|in:user_id,email,child_no,license',
+            ]);
+
+            $identifier = $request->identifier;
+            $identifierType = $request->identifier_type;
+
+            // Find user based on identifier type
+            $query = User::with(['roles', 'child', 'healthCareProvider']);
+
+            switch ($identifierType) {
+                case 'user_id':
+                    $targetUser = $query->where('id', $identifier)->first();
+                    break;
+                case 'email':
+                    $targetUser = $query->where('email', $identifier)->first();
+                    break;
+                case 'child_no':
+                    $targetUser = $query->whereHas('child', function ($q) use ($identifier) {
+                        $q->where('childNo', $identifier);
+                    })->first();
+                    break;
+                case 'license':
+                    $targetUser = $query->whereHas('healthCareProvider', function ($q) use ($identifier) {
+                        $q->where('license', $identifier);
+                    })->first();
+                    break;
+                default:
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Invalid identifier type',
+                    ], 400);
+            }
+
+            if (!$targetUser) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'User not found with the provided identifier',
+                ], 404);
+            }
+            $defaultPassword = $this->getDefaultPassword($targetUser);
+
+            if (!$defaultPassword) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Cannot determine default password for this user type',
+                ], 422);
+            }
+
+            // Update the password
+            $targetUser->password = Hash::make($defaultPassword);
+            $targetUser->save();
+
+            // Revoke all existing tokens for security
+            $targetUser->tokens()->delete();
+
+            // Log the activity
+            \App\Models\ActivityLog::create([
+                'user_id' => $request->user()->id,
+                'role' => $request->user()->getRoleNames()->first() ?? '',
+                'user_name' => $request->user()->name,
+                'action' => 'password_reset',
+                'status' => 'completed',
+                'description' => "Reset password for user: {$targetUser->name} (ID: {$targetUser->id})",
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'User password has been reset to default successfully',
+                'user' => [
+                    'id' => $targetUser->id,
+                    'name' => $targetUser->name,
+                    'email' => $targetUser->email,
+                    'username' => $targetUser->username,
+                    'roles' => $targetUser->getRoleNames(),
+                ],
+                'reset_info' => [
+                    'identifier_used' => $identifierType,
+                    'identifier_value' => $identifier,
+                    'default_password_hint' => $this->getPasswordHint($targetUser),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Reset user password failed: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reset user password',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to determine default password based on user type
+     */
+    private function getDefaultPassword($user)
+    {
+        try {
+            if ($user->hasRole('admin')) {
+                return 'Admin123';
+            }
+
+            if ($user->hasRole('child') && $user->child) {
+                return $user->child->fatherName;
+            }
+
+            if (($user->hasRole('doctor') || $user->hasRole('nurse')) && $user->healthCareProvider) {
+                return $user->healthCareProvider->facility . '@' . $user->healthCareProvider->license;
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Get default password failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get password hint for user (for admin reference)
+     */
+    private function getPasswordHint($user)
+    {
+        if ($user->hasRole('admin')) {
+            return 'Default admin password (Admin123)';
+        }
+
+        if ($user->hasRole('child') && $user->child) {
+            return "Father's name: " . $user->child->fatherName;
+        }
+
+        if (($user->hasRole('doctor') || $user->hasRole('nurse')) && $user->healthCareProvider) {
+            return "Format: {facility}@{license}";
+        }
+
+        return 'Contact system administrator';
+    }
+
+    /**
+     * Admin: Search users by various criteria
+     */
+    public function searchUsers(Request $request)
+    {
+        try {
+            $request->validate([
+                'search' => 'required|string|min:2',
+                'type' => 'nullable|string|in:all,admin,child,healthcare',
+                'limit' => 'nullable|integer|max:50',
+            ]);
+
+            $search = $request->search;
+            $type = $request->type ?? 'all';
+            $limit = $request->limit ?? 20;
+
+            $query = User::with(['roles', 'child', 'healthCareProvider']);
+
+            // Filter by user type/role
+            if ($type !== 'all') {
+                switch ($type) {
+                    case 'admin':
+                        $query->whereHas('roles', fn($q) => $q->where('name', 'admin'));
+                        break;
+                    case 'child':
+                        $query->whereHas('roles', fn($q) => $q->where('name', 'child'));
+                        break;
+                    case 'healthcare':
+                        $query->whereHas('roles', fn($q) => $q->whereIn('name', ['doctor', 'nurse']));
+                        break;
+                }
+            }
+
+            // Search in multiple fields
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhereHas('child', function ($childQuery) use ($search) {
+                        $childQuery->where('childName', 'LIKE', "%{$search}%")
+                            ->orWhere('childNo', 'LIKE', "%{$search}%")
+                            ->orWhere('fatherName', 'LIKE', "%{$search}%")
+                            ->orWhere('motherName', 'LIKE', "%{$search}%");
+                    })
+                    ->orWhereHas('healthCareProvider', function ($hcpQuery) use ($search) {
+                        $hcpQuery->where('license', 'LIKE', "%{$search}%")
+                            ->orWhere('facility', 'LIKE', "%{$search}%");
+                    });
+            });
+
+            $users = $query->limit($limit)->get()->map(function ($user) {
+                $userData = [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'roles' => $user->roles->pluck('name'),
+                    'created_at' => $user->created_at,
+                ];
+
+                // Add specific details based on role
+                if ($user->hasRole('child') && $user->child) {
+                    $userData['child_details'] = [
+                        'child_name' => $user->child->childName,
+                        'child_no' => $user->child->childNo,
+                        'father_name' => $user->child->fatherName,
+                        'mother_name' => $user->child->motherName,
+                        'date_of_birth' => $user->child->dateOfBirth,
+                        'gender' => $user->child->gender,
+                    ];
+                    $userData['identifier_options'] = [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'child_no' => $user->child->childNo,
+                    ];
+                }
+
+                if (($user->hasRole('doctor') || $user->hasRole('nurse')) && $user->healthCareProvider) {
+                    $userData['healthcare_details'] = [
+                        'license' => $user->healthCareProvider->license,
+                        'facility' => $user->healthCareProvider->facility,
+                        'contact' => $user->healthCareProvider->contact,
+                        'gender' => $user->healthCareProvider->gender,
+                        'status' => $user->healthCareProvider->status,
+                    ];
+                    $userData['identifier_options'] = [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'license' => $user->healthCareProvider->license,
+                    ];
+                }
+
+                if ($user->hasRole('admin')) {
+                    $userData['identifier_options'] = [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                    ];
+                }
+
+                return $userData;
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Search results fetched successfully',
+                'data' => $users,
+                'total' => $users->count(),
+                'search_query' => $search,
+                'search_type' => $type,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Search users failed: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to search users',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

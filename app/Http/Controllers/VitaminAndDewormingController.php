@@ -72,7 +72,7 @@ class VitaminAndDewormingController extends Controller
                 'child_id' => $childId,
                 'Vitamin_A' => $validated['Vitamin_A'],
                 'Deworming' => $validated['Deworming'],
-                'status' => 'inasubiri'
+                'status' => 'imekamilika'
             ]);
 
             // Check if visit is missed and update status

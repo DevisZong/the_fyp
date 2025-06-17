@@ -1,0 +1,76 @@
+{
+  "description": "Simplified JSON Error Responses - Clean and Concise",
+  "simplified_error_responses": {
+    "duplicate_vaccination_numbers": {
+      "your_request": {
+        "child_id": 3,
+        "health_care_provider_id": 2,
+        "vaccination_codes": ["BCG", "bOPVO"],
+        "vaccination_nos": ["VAC-8080", "VAC-8080"]
+      },
+      "error_response": {
+        "status": 422,
+        "error": "Duplicate vaccination numbers detected: VAC-8080"
+      }
+    },
+    
+    "child_not_found": {
+      "error_response": {
+        "status": 404,
+        "error": "Child not found"
+      }
+    },
+    
+    "missing_parent_or_phone": {
+      "error_response": {
+        "status": 404,
+        "error": "Parent or phone number not found"
+      }
+    },
+    
+    "sms_sending_failed": {
+      "error_response": {
+        "status": 500,
+        "error": "Failed to send SMS"
+      }
+    },
+    
+    "verification_failed": {
+      "error_response": {
+        "status": 404,
+        "error": "No pending verification found, code expired, or invalid code for vaccination code: BCG"
+      }
+    },
+    
+    "no_vaccination_record": {
+      "error_response": {
+        "status": 404,
+        "error": "No available record found for the given vaccination code: BCG"
+      }
+    },
+    
+    "array_length_mismatch": {
+      "error_response": {
+        "status": 400,
+        "error": "The number of vaccination codes must match the number of vaccination numbers"
+      }
+    }
+  },
+  
+  "what_changed": [
+    "Removed all 'message', 'details', 'suggestion', 'example' fields",
+    "Kept only essential 'error' field with clear description",
+    "For duplicates: Shows specific duplicate vaccination numbers",
+    "Clean, simple, and to the point"
+  ],
+  
+  "testing_your_scenario": {
+    "when_you_send": {
+      "vaccination_nos": ["VAC-8080", "VAC-8080"]
+    },
+    "you_will_get": {
+      "error": "Duplicate vaccination numbers detected: VAC-8080"
+    },
+    "clean_and_simple": "✅ Just the error message pointing to the duplicate number"
+  }
+}

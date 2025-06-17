@@ -124,51 +124,102 @@ class VaccinationController extends Controller
     // Improved storeWithVerification function
     public function storeWithVerification(Request $request)
     {
-        $validated = $request->validate([
-            'child_id' => 'required|exists:children,id',
-            'health_care_provider_id' => 'required|exists:health_care_providers,id',
-            'vaccination_codes' => [
-                'required',
-                'array',
-                'min:1', // Ensure at least one vaccination code is present
-            ],
-            'vaccination_codes.*' => [
-                'string',
-                'max:50',
-                Rule::exists('vaccinations', 'vaccination_code')
-            ],
-            'vaccination_nos' => [
-                'required',
-                'array',
-                'min:1', // Ensure at least one vaccination number is present
-            ],
-            'vaccination_nos.*' => [
-                'string',
-                'max:50',
-                function ($attr, $value, $fail) use ($request) {
-                    if ($value) {
-                        $count = Vaccination::where('vaccination_no', $value)->count();
-                        if ($count >= self::MAX_VACCINATION_NO_USES) {
-                            $fail("This vaccination number has reached the maximum usage limit (" . self::MAX_VACCINATION_NO_USES . " times)");
-                        }
+        try {
+            $validated = $request->validate([
+                'child_id' => 'required|exists:children,id',
+                'health_care_provider_id' => 'required|exists:health_care_providers,id',
+                'vaccination_codes' => [
+                    'required',
+                    'array',
+                    'min:1', // Ensure at least one vaccination code is present
+                ],
+                'vaccination_codes.*' => [
+                    'string',
+                    'max:50',
+                    Rule::exists('vaccinations', 'vaccination_code')
+                ],
+                'vaccination_nos' => [
+                    'required',
+                    'array',
+                    'min:1', // Ensure at least one vaccination number is present
+                ],
+                'vaccination_nos.*' => [
+                    'string',
+                    'max:50',
+                    function ($attr, $value, $fail) use ($request) {
+                        if ($value) {
+                            $count = Vaccination::where('vaccination_no', $value)->count();
+                            if ($count >= self::MAX_VACCINATION_NO_USES) {
+                                $fail("This vaccination number has reached the maximum usage limit (" . self::MAX_VACCINATION_NO_USES . " times)");
+                            }
 
-                        // Check if the vaccination number is already assigned to a different vaccination code
-                        $existingRecord = Vaccination::where('vaccination_no', $value)->first();
-                        if ($existingRecord && !in_array($existingRecord->vaccination_code, $request->vaccination_codes)) {
-                            $fail("This vaccination number is already assigned to the vaccination code '{$existingRecord->vaccination_code}'.");
+                            // Check if the vaccination number is already assigned to a different vaccination code
+                            $existingRecord = Vaccination::where('vaccination_no', $value)->first();
+                            if ($existingRecord && !in_array($existingRecord->vaccination_code, $request->vaccination_codes)) {
+                                $fail("This vaccination number is already assigned to the vaccination code '{$existingRecord->vaccination_code}'.");
+                            }
                         }
                     }
-                }
-            ],
-        ]);
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'messages' => $e->errors()
+            ], 422);
+        }
+
+        // Additional validation: Check for duplicate vaccination numbers within the same request
+        $vaccinationNos = $request->input('vaccination_nos', []);
+        $duplicateNos = array_diff_assoc($vaccinationNos, array_unique($vaccinationNos));
+        if (!empty($duplicateNos)) {
+            return response()->json([
+                'error' => 'Duplicate vaccination numbers detected: ' . implode(', ', array_values(array_unique($duplicateNos)))
+            ], 422);
+        }
+
+        // Additional validation: Check the "Hali" status of vaccinations
+        $vaccinationCodes = $validated['vaccination_codes'];
+        foreach ($vaccinationCodes as $vaccinationCode) {
+            $vaccination = Vaccination::where('vaccination_code', $vaccinationCode)
+                ->whereNull('vaccination_no')
+                ->first();
+
+            if (!$vaccination) {
+                return response()->json([
+                    'error' => "No available vaccination record found for vaccination code: {$vaccinationCode}"
+                ], 404);
+            }
+
+            // if ($vaccination->Hali !== 'inasubiri') {
+            //     if ($vaccination->Hali === 'imekosa') {
+            //         return response()->json([
+            //             'error' => "The vaccination '{$vaccinationCode}' has passed its due date and cannot be administered."
+            //         ], 422);
+            //     } 
+            //     if ($vaccination->Hali === 'imekamilika') {
+            //         return response()->json([
+            //             'error' => "The vaccination '{$vaccinationCode}' has already been completed."
+            //         ], 422);
+            //     } else {
+            //         return response()->json([
+            //             'error' => "The vaccination '{$vaccinationCode}' is not available for administration. Current status: {$vaccination->Hali}"
+            //         ], 422);
+            //     }
+            // }
+        }
 
         $child = Child::find($validated['child_id']);
         if (!$child) {
-            return response()->json(['error' => 'Child not found'], 404);
+            return response()->json([
+                'error' => 'Child not found'
+            ], 404);
         }
         $parent = $child->user;
         if (!$parent || empty($child->phoneNo)) {
-            return response()->json(['error' => 'Parent or phone number not found'], 404);
+            return response()->json([
+                'error' => 'Parent or phone number not found'
+            ], 404);
         }
 
         $vaccinationCodes = $validated['vaccination_codes'];
@@ -180,7 +231,9 @@ class VaccinationController extends Controller
         $smsService = new \App\Services\SmsService();
         $smsSent = $smsService->send($child->phoneNo, $smsMessage);
         if (!$smsSent) {
-            return response()->json(['error' => 'Failed to send SMS'], 500);
+            return response()->json([
+                'error' => 'Failed to send SMS'
+            ], 500);
         }
 
         // Store verification in DB (expires in 10 minutes)
@@ -216,50 +269,67 @@ class VaccinationController extends Controller
     // Endpoint to verify code and store vaccination (no Redis, uses DB)
     public function verifyAndStoreVaccination(Request $request)
     {
-        $validated = $request->validate([
-            'child_id' => 'required|exists:children,id',
-            'vaccination_codes' => [
-                'required',
-                'array',
-                'min:1', // Ensure at least one vaccination code is present
-            ],
-            'vaccination_codes.*' => [
-                'string',
-                'max:50',
-            ],
-            'vaccination_nos' => [
-                'required',
-                'array',
-                'min:1', // Ensure at least one vaccination number is present
-            ],
-            'vaccination_nos.*' => [
-                'string',
-                'max:50',
-                function ($attr, $value, $fail) use ($request) {
-                    if ($value) {
-                        $count = Vaccination::where('vaccination_no', $value)->count();
-                        if ($count >= self::MAX_VACCINATION_NO_USES) {
-                            $fail("This vaccination number has reached the maximum usage limit (" . self::MAX_VACCINATION_NO_USES . " times)");
-                        }
+        try {
+            $validated = $request->validate([
+                'child_id' => 'required|exists:children,id',
+                'vaccination_codes' => [
+                    'required',
+                    'array',
+                    'min:1', // Ensure at least one vaccination code is present
+                ],
+                'vaccination_codes.*' => [
+                    'string',
+                    'max:50',
+                ],
+                'vaccination_nos' => [
+                    'required',
+                    'array',
+                    'min:1', // Ensure at least one vaccination number is present
+                ],
+                'vaccination_nos.*' => [
+                    'string',
+                    'max:50',
+                    function ($attr, $value, $fail) use ($request) {
+                        if ($value) {
+                            $count = Vaccination::where('vaccination_no', $value)->count();
+                            if ($count >= self::MAX_VACCINATION_NO_USES) {
+                                $fail("This vaccination number has reached the maximum usage limit (" . self::MAX_VACCINATION_NO_USES . " times)");
+                            }
 
-                        // Check if the vaccination number is already assigned to a different vaccination code
-                        $existingRecord = Vaccination::where('vaccination_no', $value)->first();
-                        if ($existingRecord && !in_array($existingRecord->vaccination_code, $request->vaccination_codes)) {
-                            $fail("This vaccination number is already assigned to the vaccination code '{$existingRecord->vaccination_code}'.");
+                            // Check if the vaccination number is already assigned to a different vaccination code
+                            $existingRecord = Vaccination::where('vaccination_no', $value)->first();
+                            if ($existingRecord && !in_array($existingRecord->vaccination_code, $request->vaccination_codes)) {
+                                $fail("This vaccination number is already assigned to the vaccination code '{$existingRecord->vaccination_code}'.");
+                            }
                         }
                     }
-                }
-            ],
-            'verification_code' => 'required|digits:6',
-        ]);
+                ],
+                'verification_code' => 'required|digits:6',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'messages' => $e->errors()
+            ], 422);
+        }
+
+        // Additional validation: Check for duplicate vaccination numbers within the same request
+        $vaccinationNos = $request->input('vaccination_nos', []);
+        $duplicateNos = array_diff_assoc($vaccinationNos, array_unique($vaccinationNos));
+        if (!empty($duplicateNos)) {
+            return response()->json([
+                'error' => 'Duplicate vaccination numbers detected: ' . implode(', ', array_values(array_unique($duplicateNos)))
+            ], 422);
+        }
 
         DB::beginTransaction();
         try {
             $vaccinations = [];
-            $vaccinationNos = $request->input('vaccination_nos', []);
 
             if (count($validated['vaccination_codes']) !== count($vaccinationNos)) {
-                return response()->json(['error' => 'The number of vaccination codes must match the number of vaccination numbers.'], 400);
+                return response()->json([
+                    'error' => 'The number of vaccination codes must match the number of vaccination numbers'
+                ], 400);
             }
 
             foreach ($validated['vaccination_codes'] as $key => $vaccinationCode) {
@@ -273,7 +343,9 @@ class VaccinationController extends Controller
 
                 if (!$verification) {
                     DB::rollBack();
-                    return response()->json(['error' => 'No pending verification found, code expired, or invalid code for vaccination code: ' . $vaccinationCode], 404);
+                    return response()->json([
+                        'error' => 'No pending verification found, code expired, or invalid code for vaccination code: ' . $vaccinationCode
+                    ], 404);
                 }
 
                 $vaccination = Vaccination::where('vaccination_code', $vaccinationCode)
@@ -283,14 +355,16 @@ class VaccinationController extends Controller
 
                 if (!$vaccination) {
                     DB::rollBack();
-                    return response()->json(['error' => 'No available record found for the given vaccination code: ' . $vaccinationCode], 404);
+                    return response()->json([
+                        'error' => 'No available record found for the given vaccination code: ' . $vaccinationCode
+                    ], 404);
                 }
 
                 $vaccination->update([
                     'child_id' => $validated['child_id'],
                     'vaccination_no' => $vaccinationNo,
                     'Hali' => 'imekamilika',
-                    'health_care_provider_id' => $validated['health_care_provider_id']
+                    'health_care_provider_id' => $verification->health_care_provider_id
                 ]);
 
                 // Delete verification row after use
@@ -318,7 +392,7 @@ class VaccinationController extends Controller
             $child = Child::findOrFail($childId);
 
             $Data = Vaccination::where('child_id', $childId)
-                ->get(['vaccination_code', 'updated_at', 'Hali']);
+                ->get(['vaccination_code', 'updated_at', 'Hali','vaccination_no']);
             return response()->json([
                 'message' => 'Vaccination records fetched successfully',
                 'data' => $Data

@@ -1,0 +1,191 @@
+{
+  "description": "Complete workflow test for vaccination verification system",
+  "workflow_name": "Vaccination Recording with Parent Verification",
+  "test_scenarios": [
+    {
+      "scenario": "Complete Happy Path - Single Vaccination",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Initiate vaccination recording with verification",
+          "endpoint": "POST /api/vaccinations/store-with-verification",
+          "payload": {
+            "child_id": 1,
+            "health_care_provider_id": 1,
+            "vaccination_codes": ["BCG"],
+            "vaccination_nos": ["VAC001"]
+          },
+          "expected_response": {
+            "status": 200,
+            "message": "Verification code sent to parent. Awaiting confirmation."
+          },
+          "side_effects": [
+            "SMS sent to parent phone number",
+            "Verification record created in vaccination_verifications table",
+            "Verification expires in 10 minutes"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Complete vaccination recording with verification code",
+          "endpoint": "POST /api/vaccinations/verify-and-store",
+          "payload": {
+            "child_id": 1,
+            "vaccination_codes": ["BCG"],
+            "vaccination_nos": ["VAC001"],
+            "verification_code": "FROM_STEP_1_RESPONSE"
+          },
+          "expected_response": {
+            "status": 201,
+            "message": "Vaccination recorded successfully after verification.",
+            "data": [
+              {
+                "vaccination_code": "BCG",
+                "vaccination_no": "VAC001",
+                "Hali": "imekamilika"
+              }
+            ]
+          },
+          "side_effects": [
+            "Vaccination record updated from 'inasubiri' to 'imekamilika'",
+            "Verification record deleted from database",
+            "Child and healthcare provider assigned to vaccination"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "Complete Happy Path - Multiple Vaccinations",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Initiate multiple vaccinations recording with verification",
+          "endpoint": "POST /api/vaccinations/store-with-verification",
+          "payload": {
+            "child_id": 1,
+            "health_care_provider_id": 1,
+            "vaccination_codes": ["BCG", "OPV0", "HepB0"],
+            "vaccination_nos": ["VAC001", "VAC002", "VAC003"]
+          },
+          "expected_response": {
+            "status": 200,
+            "message": "Verification code sent to parent. Awaiting confirmation."
+          }
+        },
+        {
+          "step": 2,
+          "description": "Complete multiple vaccinations recording",
+          "endpoint": "POST /api/vaccinations/verify-and-store",
+          "payload": {
+            "child_id": 1,
+            "vaccination_codes": ["BCG", "OPV0", "HepB0"],
+            "vaccination_nos": ["VAC001", "VAC002", "VAC003"],
+            "verification_code": "FROM_STEP_1_RESPONSE"
+          },
+          "expected_response": {
+            "status": 201,
+            "message": "Vaccination recorded successfully after verification.",
+            "data": [
+              {"vaccination_code": "BCG", "Hali": "imekamilika"},
+              {"vaccination_code": "OPV0", "Hali": "imekamilika"},
+              {"vaccination_code": "HepB0", "Hali": "imekamilika"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "Error Case - Verification Code Expiry",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Initiate vaccination recording",
+          "endpoint": "POST /api/vaccinations/store-with-verification",
+          "payload": {
+            "child_id": 1,
+            "health_care_provider_id": 1,
+            "vaccination_codes": ["BCG"],
+            "vaccination_nos": ["VAC001"]
+          }
+        },
+        {
+          "step": 2,
+          "description": "Wait for verification to expire (>10 minutes)",
+          "action": "WAIT_OR_MANUALLY_UPDATE_DB_EXPIRY"
+        },
+        {
+          "step": 3,
+          "description": "Attempt to verify with expired code",
+          "endpoint": "POST /api/vaccinations/verify-and-store",
+          "payload": {
+            "child_id": 1,
+            "vaccination_codes": ["BCG"],
+            "vaccination_nos": ["VAC001"],
+            "verification_code": "FROM_STEP_1_RESPONSE"
+          },
+          "expected_response": {
+            "status": 404,
+            "error": "No pending verification found, code expired, or invalid code for vaccination code: BCG"
+          }
+        }
+      ]
+    }
+  ],
+  "database_setup_requirements": [
+    {
+      "table": "children",
+      "requirements": [
+        "Must have at least one child record with valid phoneNo",
+        "Child must be associated with a user (parent)"
+      ]
+    },
+    {
+      "table": "health_care_providers", 
+      "requirements": [
+        "Must have at least one healthcare provider record"
+      ]
+    },
+    {
+      "table": "vaccinations",
+      "requirements": [
+        "Must have vaccination records with Hali='inasubiri'",
+        "These records should have vaccination_no=NULL initially",
+        "vaccination_code must match the codes being tested"
+      ]
+    },
+    {
+      "table": "users",
+      "requirements": [
+        "Parent user must exist and be linked to child"
+      ]
+    }
+  ],
+  "sample_database_setup_sql": [
+    "-- Sample child record",
+    "INSERT INTO children (id, user_id, childName, phoneNo, date_of_birth) VALUES (1, 1, 'Test Child', 255123456789, '2024-01-01');",
+    "",
+    "-- Sample healthcare provider",
+    "INSERT INTO health_care_providers (id, name, email) VALUES (1, 'Test Hospital', 'hospital@test.com');",
+    "",
+    "-- Sample vaccination records (waiting to be assigned)",
+    "INSERT INTO vaccinations (vaccination_code, Hali) VALUES ('BCG', 'inasubiri');",
+    "INSERT INTO vaccinations (vaccination_code, Hali) VALUES ('OPV0', 'inasubiri');",
+    "INSERT INTO vaccinations (vaccination_code, Hali) VALUES ('HepB0', 'inasubiri');",
+    "",
+    "-- Sample parent user",
+    "INSERT INTO users (id, name, email) VALUES (1, 'Test Parent', 'parent@test.com');"
+  ],
+  "sms_message_format": {
+    "language": "Swahili",
+    "template": "Thibitisha chanjo za mtoto wako (jina: {vaccination_list}). Nambari ya uthibitisho: {verification_code}. Tafadhali mpe mtoa huduma ya afya nambari hii ikiwa unakubali.",
+    "example": "Thibitisha chanjo za mtoto wako (jina: BCG, OPV0). Nambari ya uthibitisho: 123456. Tafadhali mpe mtoa huduma ya afya nambari hii ikiwa unakubali."
+  },
+  "testing_tips": [
+    "Use Postman or similar tool to test the API endpoints",
+    "Check database state after each step",
+    "Monitor SMS service logs to ensure messages are sent",
+    "Test with different child and healthcare provider IDs",
+    "Test edge cases like invalid verification codes",
+    "Verify that verification records are properly cleaned up"
+  ]
+}

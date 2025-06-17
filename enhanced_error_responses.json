@@ -1,0 +1,163 @@
+{
+  "description": "Enhanced JSON Error Responses for Vaccination Controller",
+  "improvements_made": [
+    "Added detailed error messages with context",
+    "Included suggestions for resolution",
+    "Added structured error details",
+    "Provided troubleshooting information",
+    "Added duplicate validation with helpful examples"
+  ],
+  
+  "error_scenarios": {
+    "duplicate_vaccination_numbers": {
+      "your_request": {
+        "child_id": 3,
+        "health_care_provider_id": 2,
+        "vaccination_codes": ["BCG", "bOPVO"],
+        "vaccination_nos": ["VAC-8080", "VAC-8080"]
+      },
+      "enhanced_error_response": {
+        "status": 422,
+        "error": "Duplicate vaccination numbers detected in the request.",
+        "message": "Each vaccination must have a unique vaccination number.",
+        "duplicate_numbers": ["VAC-8080"],
+        "suggestion": "Please use different vaccination numbers for each vaccination code.",
+        "example": {
+          "vaccination_codes": ["BCG", "bOPVO"],
+          "vaccination_nos": ["VAC-8080-1", "VAC-8080-2"]
+        }
+      }
+    },
+    
+    "child_not_found": {
+      "enhanced_error_response": {
+        "status": 404,
+        "error": "Child not found",
+        "message": "The specified child does not exist in the system.",
+        "details": {
+          "child_id": 3
+        },
+        "suggestion": "Please verify the child ID and ensure the child is registered in the system."
+      }
+    },
+    
+    "missing_parent_or_phone": {
+      "enhanced_error_response": {
+        "status": 404,
+        "error": "Parent or phone number not found",
+        "message": "Unable to send SMS verification because parent information or phone number is missing.",
+        "details": {
+          "child_id": 3,
+          "child_name": "Test Child",
+          "has_parent": true,
+          "has_phone": false,
+          "phone_number": "Not provided"
+        },
+        "suggestion": "Please ensure the child has a valid phone number and is linked to a parent user account."
+      }
+    },
+    
+    "sms_sending_failed": {
+      "enhanced_error_response": {
+        "status": 500,
+        "error": "Failed to send SMS verification",
+        "message": "Unable to send verification code to the parent via SMS.",
+        "details": {
+          "phone_number": "255123456789",
+          "child_name": "Test Child",
+          "sms_message": "Thibitisha chanjo za mtoto wako..."
+        },
+        "suggestion": "Please check the phone number format and SMS service configuration.",
+        "troubleshooting": [
+          "Verify phone number is in correct international format",
+          "Check SMS service credentials and configuration", 
+          "Ensure sufficient SMS credits/balance"
+        ]
+      }
+    },
+    
+    "verification_failed": {
+      "enhanced_error_response": {
+        "status": 404,
+        "error": "Verification failed for vaccination code: BCG",
+        "message": "No pending verification found, verification code expired, or invalid verification code.",
+        "details": {
+          "vaccination_code": "BCG",
+          "verification_code_provided": "123456",
+          "child_id": 3,
+          "possible_reasons": [
+            "Verification code has expired (10 minutes limit)",
+            "Invalid verification code provided",
+            "No verification request was made for this vaccination code",
+            "Verification code already used"
+          ]
+        },
+        "suggestion": "Please request a new verification code by calling store-with-verification endpoint first."
+      }
+    },
+    
+    "no_vaccination_record": {
+      "enhanced_error_response": {
+        "status": 404,
+        "error": "No available vaccination record found for: BCG",
+        "message": "No vaccination record available for processing.",
+        "details": {
+          "vaccination_code": "BCG",
+          "required_conditions": [
+            "vaccination_code must exist in vaccinations table",
+            "vaccine must be in waiting status (Hali = inasubiri)",
+            "vaccination_no must be NULL (not yet assigned)"
+          ]
+        },
+        "suggestion": "Please ensure vaccination records are properly seeded in the database with correct status."
+      }
+    },
+    
+    "array_length_mismatch": {
+      "enhanced_error_response": {
+        "status": 400,
+        "error": "Array length mismatch.",
+        "message": "The number of vaccination codes must match the number of vaccination numbers.",
+        "provided_data": {
+          "vaccination_codes_count": 2,
+          "vaccination_nos_count": 1,
+          "vaccination_codes": ["BCG", "bOPVO"],
+          "vaccination_nos": ["VAC-8080"]
+        }
+      }
+    }
+  },
+  
+  "testing_your_duplicate_scenario": {
+    "step_1": {
+      "description": "Test your original JSON with duplicate vaccination numbers",
+      "endpoint": "POST /api/healthcare/vaccinations/store-with-verification",
+      "payload": {
+        "child_id": 3,
+        "health_care_provider_id": 2,
+        "vaccination_codes": ["BCG", "bOPVO"],
+        "vaccination_nos": ["VAC-8080", "VAC-8080"]
+      },
+      "expected_result": "Will now return detailed error about duplicate vaccination numbers"
+    },
+    "step_2": {
+      "description": "Test with corrected JSON",
+      "payload": {
+        "child_id": 3,
+        "health_care_provider_id": 2,
+        "vaccination_codes": ["BCG", "bOPVO"],
+        "vaccination_nos": ["VAC-8080", "VAC-8081"]
+      },
+      "expected_result": "Should work correctly and send SMS verification"
+    }
+  },
+  
+  "benefits_of_enhanced_errors": [
+    "Developers get clear information about what went wrong",
+    "Specific suggestions for fixing the issue",
+    "Structured data for programmatic error handling",
+    "Better debugging information",
+    "User-friendly error messages",
+    "Reduced support requests due to clearer error messages"
+  ]
+}

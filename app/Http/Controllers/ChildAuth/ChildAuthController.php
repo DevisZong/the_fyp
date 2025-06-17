@@ -37,14 +37,32 @@ class ChildAuthController extends Controller
                 ], 403);
             }
 
+            // Check if this is the user's first login by checking activity logs
+            $hasLoggedInBefore = \App\Models\ActivityLog::where('user_id', $user->id)
+                ->where('action', 'login')
+                ->exists();
+
+            $isFirstLogin = !$hasLoggedInBefore;
+
             $deviceName = $request->device_name ?? ($request->userAgent() ?? 'API Token');
 
             $token = $user->createToken($deviceName)->plainTextToken;
+
+            // Log activity
+            \App\Models\ActivityLog::create([
+                'user_id' => $user->id,
+                'role' => $user->getRoleNames()->first() ?? '',
+                'user_name' => $user->name,
+                'action' => 'login',
+                'status' => 'active',
+            ]);
 
             return response()->json([
                 'user' => $user,
                 'access_token' => $token,
                 'token_type' => 'Bearer',
+                'is_first_login' => $isFirstLogin,
+                'redirect_to_change_password' => $isFirstLogin
             ]);
         } catch (\Exception $e) {
             Log::error('Login failed: ' . $e->getMessage());
@@ -67,6 +85,16 @@ class ChildAuthController extends Controller
         try {
             // Revoke the token that was used to authenticate the current request
             $user->currentAccessToken()->delete();
+
+            // Log activity
+            \App\Models\ActivityLog::create([
+                'user_id' => $user->id,
+                'role' => $user->getRoleNames()->first() ?? '',
+                'user_name' => $user->name,
+                'action' => 'logout',
+                'status' => 'inactive',
+            ]);
+
             return response()->json(['message' => 'Logged out successfully']);
         } catch (\Exception $e) {
             report($e);
@@ -88,10 +116,26 @@ class ChildAuthController extends Controller
                 return response()->json(['message' => 'Current password is incorrect'], 403);
             }
 
+            // Check if new password is same as current password
+            if (Hash::check($request->new_password, $user->password)) {
+                return response()->json([
+                    'message' => 'New password cannot be the same as your current password'
+                ], 422);
+            }
+
             DB::beginTransaction();
             try {
                 $user->password = Hash::make($request->new_password);
                 $user->save();
+
+                // Log activity
+                \App\Models\ActivityLog::create([
+                    'user_id' => $user->id,
+                    'role' => $user->getRoleNames()->first() ?? '',
+                    'user_name' => $user->name,
+                    'action' => 'password_changed',
+                    'status' => 'active',
+                ]);
 
                 DB::commit();
                 return response()->json(['message' => 'Password changed successfully']);

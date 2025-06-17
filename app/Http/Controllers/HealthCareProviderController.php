@@ -13,7 +13,52 @@ class HealthCareProviderController extends Controller
      */
     public function index()
     {
-        //
+        try {
+            // Get all healthcare providers without loading relationships
+            $healthCareProviders = HealthCareProvider::select([
+                'id',
+                'name',
+                'license',
+                'userRole',
+                'facility',
+                'contact',
+                'gender',
+                'status',
+                'picture',
+                'created_at',
+                'updated_at'
+            ])->get();
+
+            // Transform the data to include full picture URL
+            $transformedData = $healthCareProviders->map(function ($provider) {
+                return [
+                    'id' => $provider->id,
+                    'name' => $provider->name,
+                    'license' => $provider->license,
+                    'userRole' => $provider->userRole,
+                    'facility' => $provider->facility,
+                    'contact' => $provider->contact,
+                    'gender' => $provider->gender,
+                    'status' => $provider->status,
+                    'picture' => $provider->picture ? url($provider->picture) : null,
+                    'created_at' => $provider->created_at,
+                    'updated_at' => $provider->updated_at,
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Healthcare providers retrieved successfully',
+                'data' => $transformedData,
+                'total' => $transformedData->count()
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve healthcare providers',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -140,10 +185,12 @@ class HealthCareProviderController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, HealthCareProvider $healthCareProvider)
+    public function update(Request $request, $id)
     {
         DB::beginTransaction();
         try {
+            $healthCareProvider = HealthCareProvider::findOrFail($id);
+
             $validated = $request->validate([
                 'name' => 'sometimes|string|max:255',
                 'license' => 'sometimes|string|max:255|unique:health_care_providers,license,' . $healthCareProvider->id,
@@ -207,9 +254,36 @@ class HealthCareProviderController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(HealthCareProvider $healthCareProvider)
+    public function destroy($id)
     {
-        //
+        try {
+            $healthCareProvider = HealthCareProvider::findOrFail($id);
+
+            // Delete the picture if it exists
+            if ($healthCareProvider->picture && file_exists(public_path($healthCareProvider->picture))) {
+                unlink(public_path($healthCareProvider->picture));
+            }
+
+            // Delete the user associated with the health care provider
+            $user = $healthCareProvider->user;
+            if ($user) {
+                $user->delete();
+            }
+
+            // Delete the health care provider record
+            $healthCareProvider->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Health Care Provider deleted successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete Health Care Provider',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

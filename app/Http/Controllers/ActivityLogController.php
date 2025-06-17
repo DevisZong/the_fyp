@@ -7,13 +7,25 @@ use App\Models\ActivityLog;
 use App\Models\User;
 
 class ActivityLogController extends Controller
-{
-    // Fetch activity logs for frontend
+{    // Fetch activity logs for frontend
     public function index()
     {
-        $logs = ActivityLog::with('user')
-            ->orderBy('created_at', 'desc')
-            ->get(['created_at as timestamp', 'role', 'user_name', 'action', 'status']);
-        return response()->json($logs);
+        try {
+            $logs = ActivityLog::orderBy('created_at', 'desc')
+                ->get(['id', 'created_at as timestamp', 'role', 'user_name', 'action', 'status']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Activity logs retrieved successfully',
+                'data' => $logs,
+                'total' => $logs->count()
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve activity logs',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

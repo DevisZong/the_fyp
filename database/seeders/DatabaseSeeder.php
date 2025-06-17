@@ -29,6 +29,6 @@ class DatabaseSeeder extends Seeder
         $this->call(VaccinationSeeder::class);
         $this->call(UserSeeder::class);
         $this->call(FoodFactSeeder::class);
-        $this->call(VitaminAndDewormingSeeder::class);
+        // VitaminAndDewormingSeeder removed - records are now auto-created in Child model
     }
 }

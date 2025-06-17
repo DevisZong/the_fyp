@@ -272,7 +272,12 @@ class GrowthRecordsController extends Controller
                 logger('Sending SMS');
                 if ($child->phoneNo) {
                     $smsService = new SmsService();
-                    $message = "Your child is " . strtolower($growthAssessment['status']) . ". Recommendation: " . $growthAssessment['recommendation'];
+                    
+                    // Translate status and recommendations to Swahili
+                    $swahiliStatus = $this->translateStatusToSwahili($growthAssessment['status']);
+                    $swahiliRecommendation = $this->translateRecommendationToSwahili($growthAssessment['status'], $growthAssessment['recommendation']);
+                    
+                    $message = "Mtoto wako ana {$swahiliStatus}. Mapendekezo: {$swahiliRecommendation}";
                     $smsSent = $smsService->send($child->phoneNo, $message);
                 } else {
                     $smsSent = false;
@@ -410,5 +415,44 @@ class GrowthRecordsController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Translate growth status to Swahili
+     *
+     * @param string $status
+     * @return string
+     */
+    private function translateStatusToSwahili($status)
+    {
+        $translations = [
+            'Underweight' => 'upungufu wa uzito',
+            'Severe Underweight' => 'upungufu mkubwa wa uzito',
+            'Overweight' => 'uzito wa ziada',
+            'Normal' => 'uzito wa kawaida',
+            'Obese' => 'unene kupita kiasi'
+        ];
+
+        return $translations[$status] ?? strtolower($status);
+    }
+
+    /**
+     * Translate recommendations to Swahili based on status
+     *
+     * @param string $status
+     * @param string $recommendation
+     * @return string
+     */
+    private function translateRecommendationToSwahili($status, $recommendation)
+    {
+        $swahiliRecommendations = [
+            'Underweight' => 'Mpe mtoto chakula chenye protini na kalori nyingi. Tembelea kituo cha afya kwa ushauri zaidi.',
+            'Severe Underweight' => 'Hali hii ni hatari! Peleka mtoto hospitalini haraka kwa matibabu ya dharura.',
+            'Overweight' => 'Punguza chakula chenye mafuta na sukari. Ongeza michezo na mazoezi. Tembelea daktari kwa ushauri.',
+            'Normal' => 'Endelea kumpa mtoto chakula cha lishe bora na mazoezi ya kawaida.',
+            'Obese' => 'Mtoto ana unene kupita kiasi. Tembelea daktari haraka kwa mpango wa kupunguza uzito.'
+        ];
+
+        return $swahiliRecommendations[$status] ?? 'Tembelea kituo cha afya kwa ushauri zaidi.';
     }
 }

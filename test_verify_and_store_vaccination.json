@@ -1,0 +1,162 @@
+{
+  "description": "Test data for verifyAndStoreVaccination function",
+  "endpoint": "POST /api/vaccinations/verify-and-store",
+  "test_cases": [    {
+      "name": "Valid single vaccination verification",
+      "setup": "Must first call storeWithVerification to get verification_code",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"],
+        "verification_code": "123456"
+      },
+      "expected_response": {
+        "status": 201,
+        "message": "Vaccination recorded successfully after verification.",
+        "data": [
+          {
+            "id": "vaccination_id",
+            "child_id": 1,
+            "vaccination_code": "BCG",
+            "vaccination_no": "VAC001",
+            "Hali": "imekamilika",
+            "health_care_provider_id": 1
+          }
+        ]
+      }
+    },    {
+      "name": "Valid multiple vaccinations verification",
+      "setup": "Must first call storeWithVerification to get verification_code",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG", "OPV0", "HepB0"],
+        "vaccination_nos": ["VAC001", "VAC002", "VAC003"],
+        "verification_code": "123456"
+      },
+      "expected_response": {
+        "status": 201,
+        "message": "Vaccination recorded successfully after verification.",
+        "data": [
+          {
+            "id": "vaccination_id_1",
+            "vaccination_code": "BCG",
+            "vaccination_no": "VAC001",
+            "Hali": "imekamilika"
+          },
+          {
+            "id": "vaccination_id_2", 
+            "vaccination_code": "OPV0",
+            "vaccination_no": "VAC002",
+            "Hali": "imekamilika"
+          },
+          {
+            "id": "vaccination_id_3",
+            "vaccination_code": "HepB0", 
+            "vaccination_no": "VAC003",
+            "Hali": "imekamilika"
+          }
+        ]
+      }
+    },    {
+      "name": "Invalid - missing verification_code",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"]
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "verification_code": ["The verification code field is required."]
+        }
+      }
+    },
+    {
+      "name": "Invalid - wrong verification_code format",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"],
+        "verification_code": "12345"
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "verification_code": ["The verification code must be 6 digits."]
+        }
+      }
+    },
+    {
+      "name": "Invalid - expired verification_code",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC001"],
+        "verification_code": "999999"
+      },
+      "expected_response": {
+        "status": 404,
+        "error": "No pending verification found, code expired, or invalid code for vaccination code: BCG"
+      }
+    },
+    {
+      "name": "Invalid - mismatched arrays",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG", "OPV0"],
+        "vaccination_nos": ["VAC001"],
+        "verification_code": "123456"
+      },
+      "expected_response": {
+        "status": 400,
+        "error": "The number of vaccination codes must match the number of vaccination numbers."
+      }
+    },
+    {
+      "name": "Invalid - no available vaccination record",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["NONEXISTENT_CODE"],
+        "vaccination_nos": ["VAC001"],
+        "verification_code": "123456"
+      },
+      "expected_response": {
+        "status": 404,
+        "error": "No available record found for the given vaccination code: NONEXISTENT_CODE"
+      }
+    },
+    {
+      "name": "Invalid - vaccination number exceeded usage limit",
+      "payload": {
+        "child_id": 1,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["OVERUSED_VAC_NO"],
+        "verification_code": "123456"
+      },
+      "expected_response": {
+        "status": 422,
+        "errors": {
+          "vaccination_nos.0": ["This vaccination number has reached the maximum usage limit (3 times)"]
+        }
+      }
+    }
+  ],
+  "prerequisites": [
+    "Must have valid records in vaccinations table with Hali='inasubiri' and vaccination_no=NULL",
+    "Must have valid verification record in vaccination_verifications table that hasn't expired",
+    "verification_code must match the one stored in vaccination_verifications table",
+    "child_id must exist in children table"
+  ],
+  "testing_workflow": [
+    "1. Call storeWithVerification endpoint first",
+    "2. Note the verification_code returned (or check database)",
+    "3. Use that verification_code in verifyAndStoreVaccination call",
+    "4. Verify that vaccination records are updated from 'inasubiri' to 'imekamilika'",
+    "5. Verify that verification records are deleted after successful verification"
+  ],
+  "database_state_checks": [
+    "Before verification: vaccinations table should have records with Hali='inasubiri'",
+    "After verification: vaccinations table should have records with Hali='imekamilika'",
+    "After verification: vaccination_verifications table should not have the used verification records"
+  ]
+}

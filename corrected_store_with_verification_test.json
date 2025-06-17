@@ -1,0 +1,89 @@
+{
+  "description": "Corrected test data for storeWithVerification function with authentication",
+  "endpoint": "POST /api/healthcare/vaccinations/store-with-verification",
+  "authentication_required": true,
+  "role_required": "nurse or doctor",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_TOKEN_HERE",
+    "Accept": "application/json"
+  },
+  "test_cases": [
+    {
+      "name": "Valid single vaccination request (CORRECTED)",
+      "payload": {
+        "child_id": 2,
+        "health_care_provider_id": 2,
+        "vaccination_codes": ["BCG"],
+        "vaccination_nos": ["VAC-6765"]
+      },
+      "expected_response": {
+        "status": 200,
+        "message": "Verification code sent to parent. Awaiting confirmation.",
+        "verification_code": "6-digit number"
+      }
+    },
+    {
+      "name": "Valid multiple vaccinations request (CORRECTED)",
+      "payload": {
+        "child_id": 2,
+        "health_care_provider_id": 2,
+        "vaccination_codes": ["BCG", "bOPVO"],
+        "vaccination_nos": ["VAC-6765", "VAC-8080"]
+      },
+      "expected_response": {
+        "status": 200,
+        "message": "Verification code sent to parent. Awaiting confirmation.",
+        "verification_code": "6-digit number"
+      }
+    }
+  ],
+  "authentication_steps": [
+    {
+      "step": 1,
+      "description": "Login as healthcare provider",
+      "endpoint": "POST /api/healthcare-login",
+      "payload": {
+        "email": "healthcare_provider@example.com",
+        "password": "your_password"
+      }
+    },
+    {
+      "step": 2,
+      "description": "Copy the 'token' from login response"
+    },
+    {
+      "step": 3,
+      "description": "Add Authorization header with Bearer token to vaccination request"
+    }
+  ],
+  "common_errors": [
+    {
+      "error": "Laravel welcome page shown",
+      "cause": "Route not found - usually authentication issue or wrong URL",
+      "solution": "Ensure proper authentication and correct route path"
+    },
+    {
+      "error": "401 Unauthorized",
+      "cause": "Missing or invalid authentication token",
+      "solution": "Login first and use the Bearer token"
+    },
+    {
+      "error": "403 Forbidden", 
+      "cause": "User doesn't have required role (nurse/doctor)",
+      "solution": "Ensure user has nurse or doctor role"
+    },
+    {
+      "error": "422 Validation Error",
+      "cause": "Wrong parameter names (vaccination_no vs vaccination_nos)",
+      "solution": "Use vaccination_nos (plural) not vaccination_no"
+    }
+  ],
+  "postman_setup": [
+    "1. Set base URL variable: {{base_url}} = http://your-domain.com",
+    "2. Create environment variable for token: {{auth_token}}",
+    "3. In login request, set Test script to save token:",
+    "   pm.environment.set('auth_token', pm.response.json().token);",
+    "4. In vaccination request, use Authorization: Bearer {{auth_token}}"
+  ]
+}

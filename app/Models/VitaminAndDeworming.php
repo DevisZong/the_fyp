@@ -92,23 +92,27 @@ class VitaminAndDeworming extends Model
         parent::boot();
 
         static::saving(function ($vitaminAndDeworming) {
+            // Skip automatic status changes if this is a new record being created
+            // (let the creation logic handle the initial status)
+            if (!$vitaminAndDeworming->exists) {
+                return;
+            }
+
+            $scheduledDate = Carbon::parse($vitaminAndDeworming->created_at);
+            $now = Carbon::now();
+
             // If both vitamins were given, status should be imekamilika
             if ($vitaminAndDeworming->Vitamin_A && $vitaminAndDeworming->Deworming) {
                 $vitaminAndDeworming->status = 'imekamilika';
             }
-            // If in the past and both vitamins were not given, status should be amekosa
-            else if (
-                Carbon::parse($vitaminAndDeworming->created_at)->lt(Carbon::now()) &&
-                !$vitaminAndDeworming->Vitamin_A && !$vitaminAndDeworming->Deworming
-            ) {
+            // If scheduled date is past and vitamins not given, mark as missed
+            else if ($scheduledDate->lt($now) && (!$vitaminAndDeworming->Vitamin_A && !$vitaminAndDeworming->Deworming)) {
                 $vitaminAndDeworming->status = 'amekosa';
             }
-            // For upcoming visits, status should be inasubiri
-            else if (Carbon::parse($vitaminAndDeworming->created_at)->gt(Carbon::now())) {
+            // For future visits, status should be inasubiri
+            else if ($scheduledDate->gt($now)) {
                 $vitaminAndDeworming->status = 'inasubiri';
             }
-            // If only one vitamin was given but not both, keep previous status
-            // This allows for partial completion tracking
         });
     }
 }
