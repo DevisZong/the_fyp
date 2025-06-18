@@ -8,6 +8,7 @@ use App\Http\Controllers\ChildController;
 use App\Http\Controllers\GrowthRecordsController;
 use App\Http\Controllers\VaccinationController;
 use App\Http\Controllers\HealthCareProviderController;
+use App\Http\Controllers\HealthcareReportController;
 use App\Http\Controllers\VitaminAndDewormingController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\FoodFactController;
@@ -96,6 +97,7 @@ Route::post('/healthcare-login', [AuthController::class, 'healthcareLogin'])->mi
 Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->group(function () {
     Route::get('/healthcare-profile', [HealthCareProviderController::class, 'showAuthenticated']);
     Route::get('/children', [ChildController::class, 'index']);
+    Route::get('/children/next-number', [ChildController::class, 'getNextChildNumber']);
     Route::post('/children', [ChildController::class, 'store']);
     //child-details file 
     Route::get('/children/{child}', [ChildController::class, 'show']);
@@ -115,6 +117,20 @@ Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare')->
     //end
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
+});
+
+// Healthcare Provider Routes (for settings and reports)
+Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare-providers')->group(function () {
+    // Profile management
+    Route::get('/profile', [\App\Http\Controllers\HealthcareReportController::class, 'getProfile']);
+
+    // Activity reports
+    Route::get('/reports/daily', [\App\Http\Controllers\HealthcareReportController::class, 'dailyReport']);
+    Route::get('/reports/monthly', [\App\Http\Controllers\HealthcareReportController::class, 'monthlyReport']);
+    Route::get('/reports/custom', [\App\Http\Controllers\HealthcareReportController::class, 'customReport']);
+
+    // Data export
+    Route::get('/export-data', [\App\Http\Controllers\HealthcareReportController::class, 'exportData']);
 });
 
 

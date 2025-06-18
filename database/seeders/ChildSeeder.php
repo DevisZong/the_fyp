@@ -18,7 +18,7 @@ class ChildSeeder extends Seeder
             $childData = \Database\Factories\ChildFactory::new()->make()->toArray();
 
             // Generate the child number based on the date of birth
-            $childNo = \App\Models\Child::generateChildNumber($childData['date_of_birth']);
+            $childNo = Child::generateChildNumber($childData['date_of_birth']);
 
             $user = User::factory()->create([
                 'name' => $childData['childName'],

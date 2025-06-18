@@ -69,12 +69,12 @@ class ChildController extends Controller
                 ], 404);
             } else {
                 $latestGrowthRecord = $child->latestGrowthRecord;
-                $nextCheckup = $this->calculateNextCheckup($child->dateOfBirth);
+                $nextCheckup = $this->calculateNextCheckup($child->date_of_birth);
                 return response()->json([
                     'child' => [
                         'childName' => $child->childName,
                         'childNo' => $child->childNo,
-                        'dateOfBirth' => $child->date_of_birth,
+                        'dateOfBirth' => \Carbon\Carbon::parse($child->date_of_birth)->format('Y-m-d'),
                         'gender' => $child->gender,
                         'fatherName' => $child->fatherName,
                         'birthWeight' => $child->birthWeight,
@@ -110,10 +110,10 @@ class ChildController extends Controller
                     'growthRecordSummary' => [
                         'birthWeight' => $child->birthWeight,
                         'birthHeight' => $child->birthHeight,
-                        'birthDate' => $child->date_of_birth, // fixed: use correct attribute
+                        'birthDate' => \Carbon\Carbon::parse($child->date_of_birth)->format('Y-m-d'), // fixed: use correct attribute
                         'weight' => $child->latestGrowthRecord ? $child->latestGrowthRecord->weight : null,
                         'height' => $child->latestGrowthRecord ? $child->latestGrowthRecord->height : null,
-                        'nextCheckup' => $this->calculateNextCheckup($child->dateOfBirth),
+                        'nextCheckup' => $this->calculateNextCheckup($child->date_of_birth),
                     ],
                 ]);
             }
@@ -584,6 +584,31 @@ class ChildController extends Controller
             return 'School Entry Shots';
         } else {
             return 'Up to date';
+        }
+    }
+
+    /**
+     * Get the next child number for registration
+     */
+    public function getNextChildNumber()
+    {
+        try {
+            $currentYear = date('Y');
+            $nextChildNumber = Child::generateChildNumber($currentYear . '-01-01');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Next child number generated successfully',
+                'data' => [
+                    'nextChildNumber' => $nextChildNumber
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error generating next child number',
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 }

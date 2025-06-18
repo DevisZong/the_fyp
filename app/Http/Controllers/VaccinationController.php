@@ -178,35 +178,58 @@ class VaccinationController extends Controller
             ], 422);
         }
 
-        // Additional validation: Check the "Hali" status of vaccinations
+        // Additional validation: Check the "Hali" status of vaccinations for the specific child
         $vaccinationCodes = $validated['vaccination_codes'];
+        $completedVaccinations = [];
+        $unavailableVaccinations = [];
+        $notFoundVaccinations = [];
+
         foreach ($vaccinationCodes as $vaccinationCode) {
             $vaccination = Vaccination::where('vaccination_code', $vaccinationCode)
-                ->whereNull('vaccination_no')
+                ->where('child_id', $validated['child_id'])
                 ->first();
 
             if (!$vaccination) {
-                return response()->json([
-                    'error' => "No available vaccination record found for vaccination code: {$vaccinationCode}"
-                ], 404);
+                $notFoundVaccinations[] = $vaccinationCode;
+                continue;
             }
 
-            // if ($vaccination->Hali !== 'inasubiri') {
-            //     if ($vaccination->Hali === 'imekosa') {
-            //         return response()->json([
-            //             'error' => "The vaccination '{$vaccinationCode}' has passed its due date and cannot be administered."
-            //         ], 422);
-            //     } 
-            //     if ($vaccination->Hali === 'imekamilika') {
-            //         return response()->json([
-            //             'error' => "The vaccination '{$vaccinationCode}' has already been completed."
-            //         ], 422);
-            //     } else {
-            //         return response()->json([
-            //             'error' => "The vaccination '{$vaccinationCode}' is not available for administration. Current status: {$vaccination->Hali}"
-            //         ], 422);
-            //     }
-            // }
+            // Check if vaccination is already completed
+            if ($vaccination->Hali === 'imekamilika') {
+                $completedVaccinations[$vaccinationCode] = [
+                    "The vaccination '{$vaccinationCode}' has already been completed for this child. Vaccination number: {$vaccination->vaccination_no}"
+                ];
+                continue;
+            }
+
+            // Check if vaccination is not available for administration
+            if ($vaccination->Hali !== 'inasubiri' && $vaccination->Hali !== 'amekosa') {
+                $unavailableVaccinations[$vaccinationCode] = [
+                    "The vaccination '{$vaccinationCode}' is not available for administration. Current status: {$vaccination->Hali}"
+                ];
+            }
+        }
+
+        // If there are any validation errors, return them all
+        $allErrors = array_merge($completedVaccinations, $unavailableVaccinations);
+
+        if (!empty($notFoundVaccinations)) {
+            foreach ($notFoundVaccinations as $code) {
+                $allErrors[$code] = ["No vaccination record found for vaccination code: {$code} for this child"];
+            }
+        }
+
+        if (!empty($allErrors)) {
+            return response()->json([
+                'error' => 'Vaccination validation failed',
+                'messages' => $allErrors,
+                'summary' => [
+                    'completed_count' => count($completedVaccinations),
+                    'unavailable_count' => count($unavailableVaccinations),
+                    'not_found_count' => count($notFoundVaccinations),
+                    'total_errors' => count($allErrors)
+                ]
+            ], 422);
         }
 
         $child = Child::find($validated['child_id']);
@@ -349,19 +372,19 @@ class VaccinationController extends Controller
                 }
 
                 $vaccination = Vaccination::where('vaccination_code', $vaccinationCode)
+                    ->where('child_id', $validated['child_id'])
                     ->whereNull('vaccination_no')
-                    ->where('Hali', 'inasubiri')
+                    ->whereIn('Hali', ['inasubiri', 'amekosa'])
                     ->first();
 
                 if (!$vaccination) {
                     DB::rollBack();
                     return response()->json([
-                        'error' => 'No available record found for the given vaccination code: ' . $vaccinationCode
+                        'error' => 'No available vaccination record found for child ' . $validated['child_id'] . ' with vaccination code: ' . $vaccinationCode . '. The vaccination may already be completed or does not exist for this child.'
                     ], 404);
                 }
 
                 $vaccination->update([
-                    'child_id' => $validated['child_id'],
                     'vaccination_no' => $vaccinationNo,
                     'Hali' => 'imekamilika',
                     'health_care_provider_id' => $verification->health_care_provider_id
@@ -392,7 +415,7 @@ class VaccinationController extends Controller
             $child = Child::findOrFail($childId);
 
             $Data = Vaccination::where('child_id', $childId)
-                ->get(['vaccination_code', 'updated_at', 'Hali','vaccination_no']);
+                ->get(['vaccination_code', 'updated_at', 'Hali', 'vaccination_no']);
             return response()->json([
                 'message' => 'Vaccination records fetched successfully',
                 'data' => $Data

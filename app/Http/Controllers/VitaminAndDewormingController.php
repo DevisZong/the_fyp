@@ -46,46 +46,107 @@ class VitaminAndDewormingController extends Controller
 
             // Check if child is over 5 years old
             $dob = Carbon::parse($child->date_of_birth);
-            if ($dob->diffInMonths(Carbon::now()) > 60) {
+            $currentAgeInMonths = $dob->diffInMonths(Carbon::now());
+            if ($currentAgeInMonths > 60) {
                 return response()->json([
                     'message' => 'Child is over 5 years old'
                 ], 422);
             }
 
-            // Get scheduled visits
-            $scheduledVisits = VitaminAndDeworming::getScheduledVisits($child);
+            // Determine which visit period the child is currently eligible for
+            $currentVisitPeriod = null;
+            $visitSchedule = [6, 12, 18, 24, 30, 36, 42, 48, 54, 60]; // months
+            
+            foreach ($visitSchedule as $visitMonth) {
+                // Check if child is within 1 month range of the scheduled visit
+                if ($currentAgeInMonths >= ($visitMonth - 1) && $currentAgeInMonths <= ($visitMonth + 1)) {
+                    $currentVisitPeriod = $visitMonth;
+                    break;
+                }
+            }
 
-            // Get existing non-future visits count
-            $existingVisits = VitaminAndDeworming::where('child_id', $childId)
-                ->where('created_at', '<=', Carbon::now())
-                ->count();
-
-            // Check if all visits are completed
-            if ($existingVisits >= 10) {
+            // If child is not within any valid visit period
+            if (!$currentVisitPeriod) {
                 return response()->json([
-                    'message' => 'All scheduled visits have been completed'
+                    'message' => "Child is not eligible for vitamin and deworming at current age ({$currentAgeInMonths} months). Next eligible period is at " . 
+                                 collect($visitSchedule)->first(function($month) use ($currentAgeInMonths) {
+                                     return $month > $currentAgeInMonths;
+                                 }) . " months."
                 ], 422);
             }
 
-            // Create new record
-            $record = VitaminAndDeworming::create([
-                'child_id' => $childId,
-                'Vitamin_A' => $validated['Vitamin_A'],
-                'Deworming' => $validated['Deworming'],
-                'status' => 'imekamilika'
-            ]);
+            // Check if a record already exists for this visit period
+            $existingRecord = VitaminAndDeworming::where('child_id', $childId)
+                ->whereRaw('ABS(TIMESTAMPDIFF(MONTH, ?, created_at)) <= 1', [$dob->copy()->addMonths($currentVisitPeriod)])
+                ->where('status', '!=', 'inasubiri')
+                ->first();
 
-            // Check if visit is missed and update status
-            $record->checkIfMissed();
+            if ($existingRecord) {
+                $visitNumber = array_search($currentVisitPeriod, $visitSchedule) + 1;
+                return response()->json([
+                    'message' => "A vitamin and deworming record for visit {$visitNumber} ({$currentVisitPeriod} months period) already exists for this child. Status: {$existingRecord->status}",
+                    'existing_record' => [
+                        'visit_period' => $currentVisitPeriod . ' months',
+                        'visit_number' => $visitNumber,
+                        'recorded_date' => $existingRecord->created_at->format('Y-m-d'),
+                        'vitamin_a' => $existingRecord->Vitamin_A,
+                        'deworming' => $existingRecord->Deworming,
+                        'status' => $existingRecord->status
+                    ]
+                ], 409); // 409 Conflict
+            }
+
+            // Find the existing 'inasubiri' record for this period and update it
+            $recordToUpdate = VitaminAndDeworming::where('child_id', $childId)
+                ->whereRaw('ABS(TIMESTAMPDIFF(MONTH, ?, created_at)) <= 1', [$dob->copy()->addMonths($currentVisitPeriod)])
+                ->where('status', 'inasubiri')
+                ->first();
+
+            if ($recordToUpdate) {
+                // Update the existing record
+                $recordToUpdate->update([
+                    'Vitamin_A' => $validated['Vitamin_A'],
+                    'Deworming' => $validated['Deworming'],
+                    'status' => 'imekamilika',
+                    'updated_at' => Carbon::now()
+                ]);
+                $record = $recordToUpdate;
+            } else {
+                // Create new record if no existing record found (shouldn't happen if system is working correctly)
+                $record = VitaminAndDeworming::create([
+                    'child_id' => $childId,
+                    'Vitamin_A' => $validated['Vitamin_A'],
+                    'Deworming' => $validated['Deworming'],
+                    'status' => 'imekamilika'
+                ]);
+            }
 
             // Get count of missed visits
             $missedVisits = VitaminAndDeworming::getMissedVisits($child);
 
+            // Get remaining visits count
+            $completedVisits = VitaminAndDeworming::where('child_id', $childId)
+                ->where('status', 'imekamilika')
+                ->count();
+
+            $visitNumber = array_search($currentVisitPeriod, $visitSchedule) + 1;
+
             return response()->json([
-                'message' => 'Vitamin and Deworming record created successfully',
-                'data' => $record,
-                'missed_visits' => $missedVisits,
-                'remaining_visits' => 10 - $existingVisits - 1
+                'message' => "Vitamin and Deworming record for visit {$visitNumber} ({$currentVisitPeriod} months) recorded successfully",
+                'data' => [
+                    'visit_number' => $visitNumber,
+                    'visit_period' => $currentVisitPeriod . ' months',
+                    'child_age' => $currentAgeInMonths . ' months',
+                    'vitamin_a' => $record->Vitamin_A,
+                    'deworming' => $record->Deworming,
+                    'status' => $record->status,
+                    'recorded_date' => $record->updated_at->format('Y-m-d H:i:s')
+                ],
+                'summary' => [
+                    'completed_visits' => $completedVisits,
+                    'missed_visits' => $missedVisits,
+                    'remaining_visits' => 10 - $completedVisits
+                ]
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
