@@ -397,6 +397,19 @@ class VaccinationController extends Controller
             }
 
             DB::commit();
+
+            // Log vaccination activity
+            $child = Child::find($validated['child_id']);
+            $vaccinationList = implode(', ', $validated['vaccination_codes']);
+            SystemLogsController::logActivity(
+                $request->user(),
+                'Record Vaccination',
+                "Completed vaccination for {$child->childName}: {$vaccinationList}",
+                'success',
+                'create',
+                $request
+            );
+
             return response()->json([
                 'message' => 'Vaccination recorded successfully after verification.',
                 'data' => $vaccinations

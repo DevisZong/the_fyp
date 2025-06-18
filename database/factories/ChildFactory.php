@@ -42,7 +42,7 @@ class ChildFactory extends Factory
             'birthFacility' => $this->faker->company(),
             'birthAttendant' => $this->faker->name(),
             'email' => $this->faker->unique()->safeEmail(),
-            'phoneNo' => $this->faker->randomElement(['255674960366', '255766418267', '255620840216']),
+            'phoneNo' => $this->faker->randomElement(['255674960366', '255766418267', '255742795712', '255753303422', '255765814036', '255745456947']),
             'address' => [
                 'street' => $this->faker->streetName(),
                 'ward' => $this->faker->streetSuffix(),

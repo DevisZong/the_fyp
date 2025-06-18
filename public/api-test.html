@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>API Test - Healthcare Providers</title>
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+    </head>
+    <body>
+        <div class="container mt-5">
+            <h2>Healthcare Providers API Test</h2>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>Authentication</h4>
+                    <div class="mb-3">
+                        <label for="authToken" class="form-label"
+                            >Auth Token</label
+                        >
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="authToken"
+                            placeholder="Paste your admin token here"
+                        />
+                    </div>
+                    <button class="btn btn-secondary" onclick="testAuth()">
+                        Test Auth
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <h4>API Actions</h4>
+                    <button
+                        class="btn btn-primary me-2"
+                        onclick="getAllProviders()"
+                    >
+                        Get All Providers
+                    </button>
+                    <button
+                        class="btn btn-success me-2"
+                        onclick="testAddProvider()"
+                    >
+                        Test Add Provider
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h4>Response</h4>
+                <pre
+                    id="response"
+                    class="bg-light p-3"
+                    style="max-height: 400px; overflow-y: auto"
+                ></pre>
+            </div>
+        </div>
+
+        <script>
+            const API_BASE =
+                "http://192.168.0.13:5173/api/admin/healthcare-providers";
+
+            function getAuthToken() {
+                return (
+                    document.getElementById("authToken").value ||
+                    localStorage.getItem("authToken") ||
+                    ""
+                );
+            }
+
+            function setResponse(data) {
+                document.getElementById("response").textContent =
+                    JSON.stringify(data, null, 2);
+            }
+
+            async function testAuth() {
+                try {
+                    const response = await fetch(
+                        "http://192.168.0.13:5173/api/admin/dashboard/stats",
+                        {
+                            method: "GET",
+                            headers: {
+                                Authorization: `Bearer ${getAuthToken()}`,
+                                Accept: "application/json",
+                                "Content-Type": "application/json",
+                            },
+                        }
+                    );
+
+                    const data = await response.json();
+                    setResponse({
+                        status: response.status,
+                        auth_test: data,
+                    });
+                } catch (error) {
+                    setResponse({ error: error.message });
+                }
+            }
+
+            async function getAllProviders() {
+                try {
+                    const response = await fetch(API_BASE, {
+                        method: "GET",
+                        headers: {
+                            Authorization: `Bearer ${getAuthToken()}`,
+                            Accept: "application/json",
+                            "Content-Type": "application/json",
+                        },
+                    });
+
+                    const data = await response.json();
+                    setResponse({
+                        status: response.status,
+                        providers: data,
+                    });
+                } catch (error) {
+                    setResponse({ error: error.message });
+                }
+            }
+
+            async function testAddProvider() {
+                const testData = {
+                    Name: "Test Doctor",
+                    License: "DOC" + Date.now(),
+                    userRole: "doctor",
+                    Facility: "Test Hospital",
+                    Contact: "+255123456789",
+                    gender: "male",
+                };
+
+                try {
+                    const response = await fetch(API_BASE, {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${getAuthToken()}`,
+                            Accept: "application/json",
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(testData),
+                    });
+
+                    const data = await response.json();
+                    setResponse({
+                        status: response.status,
+                        test_data: testData,
+                        result: data,
+                    });
+                } catch (error) {
+                    setResponse({ error: error.message });
+                }
+            }
+
+            // Auto-load token from localStorage
+            window.onload = function () {
+                const token = localStorage.getItem("authToken");
+                if (token) {
+                    document.getElementById("authToken").value = token;
+                }
+            };
+        </script>
+    </body>
+</html>

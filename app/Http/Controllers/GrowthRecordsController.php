@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GrowthRecords;  
-use Illuminate\Http\Request;  
-use App\Models\Child;  
-use App\Services\ChildGrowthAssessment;  
+use App\Models\GrowthRecords;
+use Illuminate\Http\Request;
+use App\Models\Child;
+use App\Services\ChildGrowthAssessment;
 use App\Services\SmsService;
 
 class GrowthRecordsController extends Controller
@@ -272,12 +272,9 @@ class GrowthRecordsController extends Controller
                 logger('Sending SMS');
                 if ($child->phoneNo) {
                     $smsService = new SmsService();
-                    
-                    // Translate status and recommendations to Swahili
-                    $swahiliStatus = $this->translateStatusToSwahili($growthAssessment['status']);
-                    $swahiliRecommendation = $this->translateRecommendationToSwahili($growthAssessment['status'], $growthAssessment['recommendation']);
-                    
-                    $message = "Mtoto wako ana {$swahiliStatus}. Mapendekezo: {$swahiliRecommendation}";
+
+                    // Create a humble and advisory message in Swahili
+                    $message = $this->createHumbleAdvisoryMessage($growthAssessment['status'], $child->first_name ?? 'mtoto wako');
                     $smsSent = $smsService->send($child->phoneNo, $message);
                 } else {
                     $smsSent = false;
@@ -286,6 +283,16 @@ class GrowthRecordsController extends Controller
                 logger('Not sending SMS');
                 $smsSent = false;
             }
+
+            // Log activity
+            SystemLogsController::logActivity(
+                $request->user(),
+                'Create Growth Record',
+                "Added growth record for child: {$child->childName} - Weight: {$validated['weight']}kg, Height: {$validated['height']}cm",
+                'success',
+                'create',
+                $request
+            );
 
             return response()->json([
                 'status' => 'success',
@@ -415,6 +422,28 @@ class GrowthRecordsController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Create a humble and advisory message in Swahili
+     *
+     * @param string $status
+     * @param string $childName
+     * @return string
+     */
+    private function createHumbleAdvisoryMessage($status, $childName = 'mtoto wako')
+    {
+        $messages = [
+            'Underweight' => "Hujambo! Tumeona kwamba {$childName} anaweza kuwa na upungufu wa uzito kidogo. Tunapendekeza kumpa chakula chenye lishe bora zaidi na kutembelea kituo cha afya kwa ushauri. Hakuna haja ya kuogopa, ni jambo la kawaida na linaweza kurekebishwa kwa urahisi.",
+
+            'Severe Underweight' => "Habari za asubuhi! Tumeona kwamba {$childName} anahitaji msaada wa haraka kwa masuala ya uzito. Tunapendekeza sana kutembelea hospitali au kituo cha afya karibu nawe sasa hivi kwa upimaji zaidi na matibabu. Tupo pamoja nawe katika hili.",
+
+            'Overweight' => "Hujambo! Tumeona kwamba {$childName} anaweza kuwa na uzito wa ziada kidogo. Hii ni jambo la kawaida na linaweza kurekebishwa. Tunapendekeza kupunguza chakula chenye mafuta na sukari, na kuongeza michezo ya kawaida. Pia ni vizuri kutembelea daktari kwa ushauri zaidi.",
+
+            'Obese' => "Habari! Tumeona kwamba {$childName} ana uzito wa ziada. Tunapendekeza sana kutembelea daktari kwa ushauri wa kitaalamu juu ya jinsi ya kumsaidia kupata uzito unaofaa. Hii ni hali inayoweza kurekebishwa kwa msaada sahihi."
+        ];
+
+        return $messages[$status] ?? "Hujambo! Tunapendekeza kutembelea kituo cha afya kwa ufuatiliaji wa uzito wa {$childName}. Tunashukuru kwa kuelewa.";
     }
 
     /**

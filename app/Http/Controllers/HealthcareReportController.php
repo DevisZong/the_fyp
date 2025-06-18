@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use App\Models\HealthCareProvider;
 use App\Models\Child;
 use App\Models\Vaccination;
@@ -324,6 +325,80 @@ class HealthcareReportController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error fetching profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send appointment SMS notifications
+     */
+    public function sendAppointmentSMS(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $healthCareProvider = HealthCareProvider::where('user_id', $user->id)->first();
+
+            if (!$healthCareProvider) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Healthcare provider not found'
+                ], 404);
+            }            // Trigger the appointment notifications command
+            Artisan::call('appointments:send-notifications');
+
+            $output = Artisan::output();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Appointment SMS notifications have been sent successfully',
+                'data' => [
+                    'command_output' => $output,
+                    'sent_by' => $healthCareProvider->name,
+                    'sent_at' => now()->toISOString()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error sending appointment SMS notifications',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send food facts SMS notifications
+     */
+    public function sendFoodFactsSMS(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $healthCareProvider = HealthCareProvider::where('user_id', $user->id)->first();
+
+            if (!$healthCareProvider) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Healthcare provider not found'
+                ], 404);
+            }            // Trigger the food facts notifications command
+            Artisan::call('foodfacts:send-notifications');
+
+            $output = Artisan::output();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Food facts SMS notifications have been sent successfully',
+                'data' => [
+                    'command_output' => $output,
+                    'sent_by' => $healthCareProvider->name,
+                    'sent_at' => now()->toISOString()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error sending food facts SMS notifications',
                 'error' => $e->getMessage()
             ], 500);
         }

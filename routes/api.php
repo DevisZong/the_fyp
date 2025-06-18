@@ -8,6 +8,7 @@ use App\Http\Controllers\ChildController;
 use App\Http\Controllers\GrowthRecordsController;
 use App\Http\Controllers\VaccinationController;
 use App\Http\Controllers\HealthCareProviderController;
+use App\Http\Controllers\AdminHealthcareProviderController;
 use App\Http\Controllers\HealthcareReportController;
 use App\Http\Controllers\VitaminAndDewormingController;
 use App\Http\Controllers\AppointmentController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\FoodFactController;
 use App\Models\HealthCareProvider;
 use PHPUnit\TextUI\Help;
 use Spatie\Permission\Contracts\Role;
+use App\Http\Controllers\ReportsController;
 
 // require __DIR__.'/child.php';
 
@@ -79,16 +81,56 @@ Route::post('/adminLogin', [AuthController::class, 'login'])->middleware('thrott
 
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/children', [ChildController::class, 'index']);
-    Route::get('/healthcare-providers', [HealthCareProviderController::class, 'index']);
-    Route::post('/healthcare-providers', [HealthCareProviderController::class, 'store']);
-    Route::put('/healthcare-providers/{id}', [HealthCareProviderController::class, 'update']);
-    Route::delete('/healthcare-providers/{id}', [HealthCareProviderController::class, 'destroy']);
+
+    // Healthcare Providers Admin Routes
+    Route::get('/healthcare-providers', [\App\Http\Controllers\AdminHealthcareProviderController::class, 'index']);
+    Route::post('/healthcare-providers', [\App\Http\Controllers\AdminHealthcareProviderController::class, 'store']);
+    Route::put('/healthcare-providers/{id}', [\App\Http\Controllers\AdminHealthcareProviderController::class, 'update']);
+    Route::delete('/healthcare-providers/{id}', [\App\Http\Controllers\AdminHealthcareProviderController::class, 'destroy']);
+    Route::post('/healthcare-providers/{id}/reset-password', [\App\Http\Controllers\AdminHealthcareProviderController::class, 'resetPassword']);
+
     Route::put('/child-update', [ChildController::class, 'update']);
     Route::get('/activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index']);
     Route::get('/users', [AuthController::class, 'getAllUsers']);
     Route::post('/search-users', [AuthController::class, 'searchUsers']);
     Route::post('/reset-password', [AuthController::class, 'resetUserPassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // System Logs Routes
+    Route::prefix('system-logs')->group(function () {
+        Route::get('/', [\App\Http\Controllers\SystemLogsController::class, 'index']);
+        Route::get('/stats', [\App\Http\Controllers\SystemLogsController::class, 'stats']);
+        Route::get('/export', [\App\Http\Controllers\SystemLogsController::class, 'export']);
+        Route::delete('/clear', [\App\Http\Controllers\SystemLogsController::class, 'clear']);
+    });
+
+    // Admin Dashboard Routes
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\AdminDashboardController::class, 'getStats']);
+        Route::get('/recent-activity', [\App\Http\Controllers\AdminDashboardController::class, 'getRecentActivity']);
+        Route::get('/notifications', [\App\Http\Controllers\AdminDashboardController::class, 'getNotifications']);
+        Route::get('/vaccination-trends', [\App\Http\Controllers\AdminDashboardController::class, 'getVaccinationTrends']);
+        Route::get('/system-progress', [\App\Http\Controllers\AdminDashboardController::class, 'getSystemProgress']);
+        Route::get('/registration-trends', [\App\Http\Controllers\AdminDashboardController::class, 'getRegistrationTrends']);
+        Route::get('/user-growth-trends', [\App\Http\Controllers\AdminDashboardController::class, 'getUserGrowthTrends']);
+        Route::get('/system-overview', [\App\Http\Controllers\AdminDashboardController::class, 'getSystemOverview']);
+        Route::get('/system-info', [\App\Http\Controllers\AdminDashboardController::class, 'getSystemInfo']);
+        Route::get('/upcoming-appointments', [\App\Http\Controllers\AdminDashboardController::class, 'getUpcomingAppointments']);
+        Route::get('/all-data', [\App\Http\Controllers\AdminDashboardController::class, 'getDashboardData']);
+    });
+
+    // Reports Routes
+    Route::prefix('reports')->group(function () {
+        Route::get('/system-summary', [ReportsController::class, 'getSystemSummary']);
+        Route::get('/healthcare-providers', [ReportsController::class, 'getHealthcareProvidersReport']);
+        Route::get('/children', [ReportsController::class, 'getChildrenReport']);
+        Route::get('/growth-records', [ReportsController::class, 'getGrowthRecordsReport']);
+        Route::get('/vaccinations', [ReportsController::class, 'getVaccinationReport']);
+        Route::get('/activity-logs', [ReportsController::class, 'getActivityLogsReport']);
+        Route::get('/vitamin-deworming', [ReportsController::class, 'getVitaminDewormingReport']);
+        Route::get('/statistics', [ReportsController::class, 'getSystemStatistics']);
+        Route::get('/export', [ReportsController::class, 'exportReport']);
+    });
 });
 
 
@@ -131,6 +173,10 @@ Route::middleware(['auth:sanctum', 'role:nurse|doctor'])->prefix('healthcare-pro
 
     // Data export
     Route::get('/export-data', [\App\Http\Controllers\HealthcareReportController::class, 'exportData']);
+
+    // SMS notifications
+    Route::post('/send-appointment-sms', [\App\Http\Controllers\HealthcareReportController::class, 'sendAppointmentSMS']);
+    Route::post('/send-foodfacts-sms', [\App\Http\Controllers\HealthcareReportController::class, 'sendFoodFactsSMS']);
 });
 
 

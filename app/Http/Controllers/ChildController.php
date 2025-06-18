@@ -258,6 +258,16 @@ class ChildController extends Controller
             // Send SMS to parent with credentials and vaccination info
             $this->sendWelcomeSms($child, $validated['phoneNo'], $validated['childNo'], $validated['fatherName']);
 
+            // Log activity
+            SystemLogsController::logActivity(
+                $request->user(),
+                'Create Child Record',
+                "Added new child: {$validated['childName']} (ID: {$validated['childNo']})",
+                'success',
+                'create',
+                $request
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Child created successfully. Appointments generated automatically.',
@@ -354,8 +364,19 @@ class ChildController extends Controller
             ]);
 
             $child = Child::findOrFail($validated['id']);
+            $childName = $child->childName;
             $child->fill($validated);
             $child->save();
+
+            // Log activity
+            SystemLogsController::logActivity(
+                $request->user(),
+                'Update Child Record',
+                "Updated child information: {$childName} (ID: {$child->id})",
+                'success',
+                'update',
+                $request
+            );
 
             return response()->json([
                 'status' => 'success',
